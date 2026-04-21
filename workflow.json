@@ -24,7 +24,7 @@
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
-            { "name": "status", "value": "FINISHED" },
+            { "name": "status",   "value": "FINISHED" },
             { "name": "dateFrom", "value": "={{ DateTime.now().toFormat('yyyy-MM-dd') }}" },
             { "name": "dateTo",   "value": "={{ DateTime.now().toFormat('yyyy-MM-dd') }}" }
           ]
@@ -161,9 +161,9 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "x-api-key",          "value": "={{ $vars.CLAUDE_API_KEY }}" },
-            { "name": "anthropic-version",  "value": "2023-06-01" },
-            { "name": "content-type",       "value": "application/json" }
+            { "name": "x-api-key",         "value": "={{ $vars.CLAUDE_API_KEY }}" },
+            { "name": "anthropic-version", "value": "2023-06-01" },
+            { "name": "content-type",      "value": "application/json" }
           ]
         },
         "sendBody": true,
@@ -179,7 +179,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const claudeResp = $input.first().json;\nconst promptData = $('Build Claude Prompt').first().json;\nconst generatedContent = claudeResp.content?.[0]?.text?.trim() || '';\nif (!generatedContent) {\n  throw new Error('Claude returned empty content for ' + promptData.teamName);\n}\nreturn [{ json: { ...promptData, generatedContent } }];"
+        "jsCode": "const claudeResp = $input.first().json;\nconst promptData = $('Build Claude Prompt').first().json;\nconst generatedContent = claudeResp.content?.[0]?.text?.trim() || '';\nif (!generatedContent) {\n  throw new Error('Claude returned empty content for ' + promptData.teamName);\n}\nconst resultEmoji = promptData.result === 'WIN' ? ':white_check_mark:' : promptData.result === 'LOSS' ? ':x:' : ':heavy_minus_sign:';\nconst scoreText = promptData.goalsFor + '-' + promptData.goalsAgainst;\nconst slackBody = {\n  text: promptData.teamName + ' | ' + promptData.result + ' ' + scoreText + ' vs ' + promptData.opponentName,\n  blocks: [\n    {\n      type: 'header',\n      text: { type: 'plain_text', text: promptData.teamName + '  |  ' + promptData.result + ' ' + scoreText, emoji: true }\n    },\n    {\n      type: 'section',\n      text: {\n        type: 'mrkdwn',\n        text: resultEmoji + '  *vs ' + promptData.opponentName + '*  (' + promptData.competition + ')\\n\\n' + generatedContent\n      }\n    },\n    {\n      type: 'context',\n      elements: [\n        {\n          type: 'mrkdwn',\n          text: 'Group: ' + promptData.group + (promptData.nextOpponent !== 'TBD' ? '  |  Next: ' + promptData.nextOpponent + ' (' + promptData.nextCompetition + ')' : '  |  No upcoming match scheduled')\n        }\n      ]\n    }\n  ]\n};\nreturn [{ json: { ...promptData, generatedContent, slackBody } }];"
       },
       "id": "node-012",
       "name": "Parse Claude Response",
@@ -189,67 +189,28 @@
     },
     {
       "parameters": {
-        "method": "GET",
-        "url": "={{$vars.WORDPRESS_URL}}/wp-json/wp/v2/posts/{{$json.postId}}",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "Authorization", "value": "=Basic {{$vars.WORDPRESS_AUTH_BASE64}}" }
-          ]
-        },
-        "sendQuery": true,
-        "queryParameters": {
-          "parameters": [{ "name": "context", "value": "edit" }]
-        },
+        "method": "POST",
+        "url": "={{ $vars.SLACK_WEBHOOK_URL }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.slackBody }}",
         "options": {}
       },
       "id": "node-013",
-      "name": "GET WordPress Post",
+      "name": "Send Slack Message",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [2880, 80]
     },
     {
       "parameters": {
-        "jsCode": "const wpPost = $input.first().json;\nconst teamData = $('Parse Claude Response').first().json;\nconst rawContent = wpPost.content?.raw || '';\nconst newText = teamData.generatedContent;\nconst START_MARKER = '<!-- wp:paragraph {\"className\":\"match-update\"} -->';\nconst OPEN_P = '<p class=\"match-update\">';\nconst CLOSE_P = '</p>';\nconst END_MARKER = '<!-- /wp:paragraph -->';\nlet updatedContent;\nconst startIdx = rawContent.indexOf(START_MARKER);\nif (startIdx !== -1) {\n  const openPIdx = rawContent.indexOf(OPEN_P, startIdx);\n  const closePIdx = rawContent.indexOf(CLOSE_P, openPIdx + OPEN_P.length);\n  if (openPIdx !== -1 && closePIdx !== -1) {\n    updatedContent = rawContent.substring(0, openPIdx + OPEN_P.length) + newText + rawContent.substring(closePIdx);\n  } else {\n    updatedContent = rawContent;\n  }\n} else {\n  updatedContent = rawContent + '\\n\\n' + START_MARKER + '\\n' + OPEN_P + newText + CLOSE_P + '\\n' + END_MARKER;\n}\nconst wpBody = { content: updatedContent };\nreturn [{ json: { ...teamData, updatedContent, postSlug: wpPost.slug, wpBody } }];"
-      },
-      "id": "node-014",
-      "name": "Find and Replace Block Content",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [3100, 80]
-    },
-    {
-      "parameters": {
-        "method": "PATCH",
-        "url": "={{$vars.WORDPRESS_URL}}/wp-json/wp/v2/posts/{{$json.postId}}",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            { "name": "Authorization", "value": "=Basic {{$vars.WORDPRESS_AUTH_BASE64}}" },
-            { "name": "Content-Type",  "value": "application/json" }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ $json.wpBody }}",
-        "options": {}
-      },
-      "id": "node-015",
-      "name": "PATCH WordPress Post",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [3320, 80]
-    },
-    {
-      "parameters": {
-        "jsCode": "const d = $('Find and Replace Block Content').first().json;\nconst ts = new Date().toISOString();\nconsole.log('[' + ts + '] OK | ' + d.teamName + ' | post ' + d.postId + ' | ' + d.result + ' ' + d.goalsFor + '-' + d.goalsAgainst + ' vs ' + d.opponentName);\nreturn [{ json: { success: true, timestamp: ts, team: d.teamName, postId: d.postId, result: d.result + ' ' + d.goalsFor + '-' + d.goalsAgainst, opponent: d.opponentName, competition: d.competition } }];"
+        "jsCode": "const d = $('Parse Claude Response').first().json;\nconst ts = new Date().toISOString();\nconsole.log('[' + ts + '] OK | ' + d.teamName + ' | Slack sent | ' + d.result + ' ' + d.goalsFor + '-' + d.goalsAgainst + ' vs ' + d.opponentName);\nreturn [{ json: { success: true, timestamp: ts, team: d.teamName, result: d.result + ' ' + d.goalsFor + '-' + d.goalsAgainst, opponent: d.opponentName, competition: d.competition } }];"
       },
       "id": "node-016",
       "name": "Log Success",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [3540, 80]
+      "position": [3100, 80]
     },
     {
       "parameters": {},
@@ -277,8 +238,8 @@
     },
     {
       "parameters": {
-        "content": "## SETUP — Read Before Activating\n\n### 1. n8n Variables (Settings → Variables)\n\n| Variable | Value |\n|---|---|\n| `FOOTBALL_DATA_API_KEY` | Key from football-data.org |\n| `COMPETITION_ID` | `PL` Premier League · `CL` Champions League · `PD` La Liga · `BL1` Bundesliga · `SA` Serie A · `FL1` Ligue 1 |\n| `CLAUDE_API_KEY` | Anthropic key from console.anthropic.com |\n| `WORDPRESS_URL` | e.g. `https://yoursite.com` — no trailing slash |\n| `WORDPRESS_AUTH_BASE64` | `base64(username:app_password)` — generate at yoursite.com/wp-admin → Users → Application Passwords |\n\n### 2. Team Map\nEdit the **Team Lookup** Code node. Replace the example entries with your actual team names (exactly as returned by football-data.org) and their WordPress post IDs. See `team-config.json` in this repo.\n\n### 3. WordPress Block Target\nThis workflow targets `<p class=\"match-update\">` Gutenberg blocks. In each team page, add the CSS class `match-update` to the paragraph block you want updated (Block → Advanced → Additional CSS class). If none exists, the workflow appends a new block.\n\n### 4. Test First\nUse **Test Workflow** before activating. Inspect each node's output in the execution log.",
-        "height": 500,
+        "content": "## SETUP — Read Before Activating\n\n### 1. n8n Variables (Settings → Variables)\n\n| Variable | Value |\n|---|---|\n| `FOOTBALL_DATA_API_KEY` | Key from football-data.org |\n| `COMPETITION_ID` | `PL` Premier League · `CL` Champions League · `PD` La Liga · `BL1` Bundesliga · `SA` Serie A · `FL1` Ligue 1 |\n| `CLAUDE_API_KEY` | Anthropic key from console.anthropic.com |\n| `SLACK_WEBHOOK_URL` | Incoming Webhook URL — create at api.slack.com/apps → your app → Incoming Webhooks |\n\n### 2. Team Map\nEdit the **Team Lookup** Code node. Replace the example entries with your actual team names (exactly as returned by football-data.org) and their post IDs. See `team-config.json` in this repo.\n\n### 3. Slack Message Format\nEach matched team sends a Block Kit message with a header (team + score), the Claude-generated copy, and a context line showing the group and next fixture. Customise the `slackBody` in **Parse Claude Response** if you need a different layout.\n\n### 4. Test First\nUse **Test Workflow** before activating. Inspect each node's output in the execution log.",
+        "height": 460,
         "width": 600,
         "color": 4
       },
@@ -316,8 +277,8 @@
     },
     "Team in Config?": {
       "main": [
-        [{ "node": "Fetch Next Match",      "type": "main", "index": 0 }],
-        [{ "node": "Skip - Not in Config",  "type": "main", "index": 0 }]
+        [{ "node": "Fetch Next Match",     "type": "main", "index": 0 }],
+        [{ "node": "Skip - Not in Config", "type": "main", "index": 0 }]
       ]
     },
     "Skip - Not in Config": {
@@ -336,15 +297,9 @@
       "main": [[{ "node": "Parse Claude Response", "type": "main", "index": 0 }]]
     },
     "Parse Claude Response": {
-      "main": [[{ "node": "GET WordPress Post", "type": "main", "index": 0 }]]
+      "main": [[{ "node": "Send Slack Message", "type": "main", "index": 0 }]]
     },
-    "GET WordPress Post": {
-      "main": [[{ "node": "Find and Replace Block Content", "type": "main", "index": 0 }]]
-    },
-    "Find and Replace Block Content": {
-      "main": [[{ "node": "PATCH WordPress Post", "type": "main", "index": 0 }]]
-    },
-    "PATCH WordPress Post": {
+    "Send Slack Message": {
       "main": [[{ "node": "Log Success", "type": "main", "index": 0 }]]
     },
     "Log Success": {
@@ -356,9 +311,9 @@
   "staticData": null,
   "tags": [
     { "name": "football" },
-    { "name": "wordpress" },
+    { "name": "slack" },
     { "name": "auto-update" }
   ],
   "triggerCount": 0,
-  "versionId": "1"
+  "versionId": "2"
 }
