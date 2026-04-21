@@ -14,19 +14,21 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "=https://api.football-data.org/v4/competitions/{{$vars.COMPETITION_ID}}/matches",
+        "url": "https://v3.football.api-sports.io/fixtures",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "X-Auth-Token", "value": "={{ $vars.FOOTBALL_DATA_API_KEY }}" }
+            { "name": "x-apisports-key", "value": "={{ $vars.APISPORTS_KEY }}" }
           ]
         },
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
-            { "name": "status",   "value": "FINISHED" },
-            { "name": "dateFrom", "value": "={{ DateTime.now().toFormat('yyyy-MM-dd') }}" },
-            { "name": "dateTo",   "value": "={{ DateTime.now().toFormat('yyyy-MM-dd') }}" }
+            { "name": "league", "value": "={{ $vars.LEAGUE_ID }}" },
+            { "name": "season", "value": "={{ $vars.SEASON }}" },
+            { "name": "status", "value": "FT" },
+            { "name": "from",   "value": "={{ DateTime.now().toFormat('yyyy-MM-dd') }}" },
+            { "name": "to",     "value": "={{ DateTime.now().toFormat('yyyy-MM-dd') }}" }
           ]
         },
         "options": {}
@@ -44,7 +46,7 @@
           "conditions": [
             {
               "id": "cond-matches",
-              "leftValue": "={{ ($json.matches || []).length }}",
+              "leftValue": "={{ ($json.response || []).length }}",
               "rightValue": 0,
               "operator": { "type": "number", "operation": "gt" }
             }
@@ -61,7 +63,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const matches = $input.first().json.matches || [];\nconst teams = [];\nfor (const match of matches) {\n  if (match.status !== 'FINISHED') continue;\n  const homeScore = match.score?.fullTime?.home ?? 0;\n  const awayScore = match.score?.fullTime?.away ?? 0;\n  teams.push({\n    teamId: match.homeTeam.id,\n    teamName: match.homeTeam.name,\n    opponentName: match.awayTeam.name,\n    isHome: true,\n    goalsFor: homeScore,\n    goalsAgainst: awayScore,\n    matchId: match.id,\n    matchDate: match.utcDate,\n    competition: match.competition.name\n  });\n  teams.push({\n    teamId: match.awayTeam.id,\n    teamName: match.awayTeam.name,\n    opponentName: match.homeTeam.name,\n    isHome: false,\n    goalsFor: awayScore,\n    goalsAgainst: homeScore,\n    matchId: match.id,\n    matchDate: match.utcDate,\n    competition: match.competition.name\n  });\n}\nreturn teams.map(t => ({ json: t }));"
+        "jsCode": "const fixtures = $input.first().json.response || [];\nconst teams = [];\nfor (const fixture of fixtures) {\n  const status = fixture.fixture?.status?.short;\n  if (status !== 'FT' && status !== 'AET' && status !== 'PEN') continue;\n  const homeScore = fixture.goals?.home ?? 0;\n  const awayScore = fixture.goals?.away ?? 0;\n  teams.push({\n    teamId: fixture.teams.home.id,\n    teamName: fixture.teams.home.name,\n    opponentName: fixture.teams.away.name,\n    isHome: true,\n    goalsFor: homeScore,\n    goalsAgainst: awayScore,\n    matchId: fixture.fixture.id,\n    matchDate: fixture.fixture.date,\n    competition: fixture.league.name\n  });\n  teams.push({\n    teamId: fixture.teams.away.id,\n    teamName: fixture.teams.away.name,\n    opponentName: fixture.teams.home.name,\n    isHome: false,\n    goalsFor: awayScore,\n    goalsAgainst: homeScore,\n    matchId: fixture.fixture.id,\n    matchDate: fixture.fixture.date,\n    competition: fixture.league.name\n  });\n}\nreturn teams.map(t => ({ json: t }));"
       },
       "id": "node-004",
       "name": "Extract Teams From Matches",
@@ -79,7 +81,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// CONFIGURE: map football-data team names to WordPress post IDs + groups.\n// Team names must exactly match what football-data.org returns.\n// Tip: run once and inspect \"Fetch Finished Matches\" output to see exact names.\n// See team-config.json in this repo for the full reference structure.\nconst TEAM_MAP = {\n  // \"Exact Team Name\": { postId: 0, group: \"Group Name\" },\n  \"Manchester United FC\": { postId: 101, group: \"Group A\" },\n  \"Arsenal FC\":           { postId: 102, group: \"Group B\" },\n  \"Chelsea FC\":           { postId: 103, group: \"Group B\" },\n  \"Liverpool FC\":         { postId: 104, group: \"Group A\" }\n};\nconst data = $input.first().json;\nconst config = TEAM_MAP[data.teamName];\nif (!config) {\n  return [{ json: { ...data, postId: null, skip: true } }];\n}\nreturn [{ json: { ...data, postId: config.postId, group: config.group, skip: false } }];"
+        "jsCode": "// CONFIGURE: map api-sports team names to post IDs + groups.\n// Names must exactly match what api-sports returns — check Extract Teams output to confirm.\n// apisportsId values are for reference only (the API returns names, not IDs, in team name fields).\n// See team-config.json in this repo for common Premier League IDs.\nconst TEAM_MAP = {\n  // \"Exact Team Name\": { postId: 0, group: \"Group Name\" },\n  \"Manchester United\": { postId: 101, group: \"Group A\" },\n  \"Arsenal\":           { postId: 102, group: \"Group B\" },\n  \"Chelsea\":           { postId: 103, group: \"Group B\" },\n  \"Liverpool\":         { postId: 104, group: \"Group A\" }\n};\nconst data = $input.first().json;\nconst config = TEAM_MAP[data.teamName];\nif (!config) {\n  return [{ json: { ...data, postId: null, skip: true } }];\n}\nreturn [{ json: { ...data, postId: config.postId, group: config.group, skip: false } }];"
       },
       "id": "node-006",
       "name": "Team Lookup",
@@ -112,18 +114,18 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "=https://api.football-data.org/v4/teams/{{$json.teamId}}/matches",
+        "url": "https://v3.football.api-sports.io/fixtures",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "X-Auth-Token", "value": "={{ $vars.FOOTBALL_DATA_API_KEY }}" }
+            { "name": "x-apisports-key", "value": "={{ $vars.APISPORTS_KEY }}" }
           ]
         },
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
-            { "name": "status", "value": "SCHEDULED" },
-            { "name": "limit",  "value": "1" }
+            { "name": "team", "value": "={{ $json.teamId }}" },
+            { "name": "next", "value": "1" }
           ]
         },
         "options": {}
@@ -136,7 +138,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const teamData = $('Team Lookup').first().json;\nconst nextMatchResp = $input.first().json;\nconst nextMatch = (nextMatchResp.matches || [])[0] || null;\nlet nextOpponent = 'TBD', nextMatchDate = null, nextCompetition = 'TBD';\nif (nextMatch) {\n  nextOpponent = nextMatch.homeTeam.id === teamData.teamId\n    ? nextMatch.awayTeam.name\n    : nextMatch.homeTeam.name;\n  nextMatchDate = nextMatch.utcDate;\n  nextCompetition = nextMatch.competition?.name || 'TBD';\n}\nconst { goalsFor, goalsAgainst } = teamData;\nconst result = goalsFor > goalsAgainst ? 'WIN' : goalsFor < goalsAgainst ? 'LOSS' : 'DRAW';\nreturn [{ json: { ...teamData, result, nextOpponent, nextMatchDate, nextCompetition } }];"
+        "jsCode": "const teamData = $('Team Lookup').first().json;\nconst nextMatchResp = $input.first().json;\nconst nextFixtures = nextMatchResp.response || [];\nconst nextFixture = nextFixtures[0] || null;\nlet nextOpponent = 'TBD', nextMatchDate = null, nextCompetition = 'TBD';\nif (nextFixture) {\n  nextOpponent = nextFixture.teams.home.id === teamData.teamId\n    ? nextFixture.teams.away.name\n    : nextFixture.teams.home.name;\n  nextMatchDate = nextFixture.fixture.date;\n  nextCompetition = nextFixture.league?.name || 'TBD';\n}\nconst { goalsFor, goalsAgainst } = teamData;\nconst result = goalsFor > goalsAgainst ? 'WIN' : goalsFor < goalsAgainst ? 'LOSS' : 'DRAW';\nreturn [{ json: { ...teamData, result, nextOpponent, nextMatchDate, nextCompetition } }];"
       },
       "id": "node-009",
       "name": "Build Match Context",
@@ -238,8 +240,8 @@
     },
     {
       "parameters": {
-        "content": "## SETUP — Read Before Activating\n\n### 1. n8n Variables (Settings → Variables)\n\n| Variable | Value |\n|---|---|\n| `FOOTBALL_DATA_API_KEY` | Key from football-data.org |\n| `COMPETITION_ID` | `PL` Premier League · `CL` Champions League · `PD` La Liga · `BL1` Bundesliga · `SA` Serie A · `FL1` Ligue 1 |\n| `CLAUDE_API_KEY` | Anthropic key from console.anthropic.com |\n| `SLACK_WEBHOOK_URL` | Incoming Webhook URL — create at api.slack.com/apps → your app → Incoming Webhooks |\n\n### 2. Team Map\nEdit the **Team Lookup** Code node. Replace the example entries with your actual team names (exactly as returned by football-data.org) and their post IDs. See `team-config.json` in this repo.\n\n### 3. Slack Message Format\nEach matched team sends a Block Kit message with a header (team + score), the Claude-generated copy, and a context line showing the group and next fixture. Customise the `slackBody` in **Parse Claude Response** if you need a different layout.\n\n### 4. Test First\nUse **Test Workflow** before activating. Inspect each node's output in the execution log.",
-        "height": 460,
+        "content": "## SETUP — Read Before Activating\n\n### 1. Variables (hardcode directly in each node if your n8n plan doesn't support Variables)\n\n| Variable | Value |\n|---|---|\n| `APISPORTS_KEY` | Your key from api-sports.io dashboard |\n| `LEAGUE_ID` | `39` Premier League · `2` Champions League · `140` La Liga · `78` Bundesliga · `135` Serie A · `61` Ligue 1 |\n| `SEASON` | Start year of the season, e.g. `2025` for 2025/26 |\n| `CLAUDE_API_KEY` | Anthropic key from console.anthropic.com |\n| `SLACK_WEBHOOK_URL` | Incoming Webhook URL from api.slack.com/apps |\n\n### 2. Team Map\nEdit the **Team Lookup** Code node. Replace examples with your actual team names (as returned by api-sports — check Extract Teams output after a test run) and their post IDs. See `team-config.json` for common PL team IDs.\n\n### 3. Test First\nUse **Test Workflow** before activating. Inspect each node's output in the execution log.",
+        "height": 420,
         "width": 600,
         "color": 4
       },
@@ -315,5 +317,5 @@
     { "name": "auto-update" }
   ],
   "triggerCount": 0,
-  "versionId": "2"
+  "versionId": "3"
 }

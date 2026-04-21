@@ -1,17 +1,21 @@
 {
   "_notes": {
-    "competitionIds": "PL=Premier League, CL=Champions League, PD=La Liga, BL1=Bundesliga, SA=Serie A, FL1=Ligue 1, EC=Euros, WC=World Cup",
-    "teamNames": "Team names must exactly match what football-data.org returns. Run the workflow once and inspect the Fetch Finished Matches output to confirm exact names.",
-    "postIds": "Find WordPress post IDs in wp-admin: hover over Edit for a post and read the ?post= value in the URL, or use the REST API: /wp-json/wp/v2/posts?search=TeamName",
-    "wordpressAuth": "Generate an Application Password at yoursite.com/wp-admin > Users > Your Profile > Application Passwords. Then base64-encode username:app_password (e.g. in terminal: echo -n 'admin:xxxx xxxx xxxx' | base64)"
+    "leagueIds": "39=Premier League, 2=Champions League, 140=La Liga, 78=Bundesliga, 135=Serie A, 61=Ligue 1",
+    "season": "Use the start year of the season, e.g. 2025 for the 2025/26 season",
+    "teamNames": "Team names must exactly match what api-sports returns. Run the workflow once and inspect Extract Teams From Matches output to confirm.",
+    "teamIds": "api-sports team IDs differ from football-data.org. Common Premier League IDs listed below.",
+    "postIds": "Find WordPress post IDs in wp-admin: hover over Edit for a post and read ?post= in the URL"
   },
-  "competitionId": "PL",
+  "leagueId": 39,
+  "season": 2025,
   "teams": {
-    "Manchester United FC": { "postId": 101, "group": "Group A" },
-    "Arsenal FC":           { "postId": 102, "group": "Group B" },
-    "Chelsea FC":           { "postId": 103, "group": "Group B" },
-    "Liverpool FC":         { "postId": 104, "group": "Group A" },
-    "Manchester City FC":   { "postId": 105, "group": "Group A" },
-    "Tottenham Hotspur FC": { "postId": 106, "group": "Group C" }
+    "Manchester United": { "postId": 101, "apisportsId": 33, "group": "Group A" },
+    "Arsenal":           { "postId": 102, "apisportsId": 42, "group": "Group B" },
+    "Chelsea":           { "postId": 103, "apisportsId": 49, "group": "Group B" },
+    "Liverpool":         { "postId": 104, "apisportsId": 40, "group": "Group A" },
+    "Manchester City":   { "postId": 105, "apisportsId": 50, "group": "Group A" },
+    "Tottenham":         { "postId": 106, "apisportsId": 47, "group": "Group C" },
+    "Newcastle United":  { "postId": 107, "apisportsId": 34, "group": "Group C" },
+    "Aston Villa":       { "postId": 108, "apisportsId": 66, "group": "Group D" }
   }
 }
