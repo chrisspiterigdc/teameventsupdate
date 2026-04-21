@@ -1,0 +1,364 @@
+{
+  "name": "Auto-Update Team Pages from Match Results",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": { "interval": [{ "field": "minutes", "minutesInterval": 30 }] }
+      },
+      "id": "node-001",
+      "name": "Poll Every 30 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.football-data.org/v4/competitions/{{$vars.COMPETITION_ID}}/matches",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Auth-Token", "value": "={{ $vars.FOOTBALL_DATA_API_KEY }}" }
+          ]
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "status", "value": "FINISHED" },
+            { "name": "dateFrom", "value": "={{ DateTime.now().toFormat('yyyy-MM-dd') }}" },
+            { "name": "dateTo",   "value": "={{ DateTime.now().toFormat('yyyy-MM-dd') }}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-002",
+      "name": "Fetch Finished Matches",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [
+            {
+              "id": "cond-matches",
+              "leftValue": "={{ ($json.matches || []).length }}",
+              "rightValue": 0,
+              "operator": { "type": "number", "operation": "gt" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "node-003",
+      "name": "Any Matches Finished?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const matches = $input.first().json.matches || [];\nconst teams = [];\nfor (const match of matches) {\n  if (match.status !== 'FINISHED') continue;\n  const homeScore = match.score?.fullTime?.home ?? 0;\n  const awayScore = match.score?.fullTime?.away ?? 0;\n  teams.push({\n    teamId: match.homeTeam.id,\n    teamName: match.homeTeam.name,\n    opponentName: match.awayTeam.name,\n    isHome: true,\n    goalsFor: homeScore,\n    goalsAgainst: awayScore,\n    matchId: match.id,\n    matchDate: match.utcDate,\n    competition: match.competition.name\n  });\n  teams.push({\n    teamId: match.awayTeam.id,\n    teamName: match.awayTeam.name,\n    opponentName: match.homeTeam.name,\n    isHome: false,\n    goalsFor: awayScore,\n    goalsAgainst: homeScore,\n    matchId: match.id,\n    matchDate: match.utcDate,\n    competition: match.competition.name\n  });\n}\nreturn teams.map(t => ({ json: t }));"
+      },
+      "id": "node-004",
+      "name": "Extract Teams From Matches",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 180]
+    },
+    {
+      "parameters": { "batchSize": 1, "options": {} },
+      "id": "node-005",
+      "name": "Loop: Split Teams",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [1120, 180]
+    },
+    {
+      "parameters": {
+        "jsCode": "// CONFIGURE: map football-data team names to WordPress post IDs + groups.\n// Team names must exactly match what football-data.org returns.\n// Tip: run once and inspect \"Fetch Finished Matches\" output to see exact names.\n// See team-config.json in this repo for the full reference structure.\nconst TEAM_MAP = {\n  // \"Exact Team Name\": { postId: 0, group: \"Group Name\" },\n  \"Manchester United FC\": { postId: 101, group: \"Group A\" },\n  \"Arsenal FC\":           { postId: 102, group: \"Group B\" },\n  \"Chelsea FC\":           { postId: 103, group: \"Group B\" },\n  \"Liverpool FC\":         { postId: 104, group: \"Group A\" }\n};\nconst data = $input.first().json;\nconst config = TEAM_MAP[data.teamName];\nif (!config) {\n  return [{ json: { ...data, postId: null, skip: true } }];\n}\nreturn [{ json: { ...data, postId: config.postId, group: config.group, skip: false } }];"
+      },
+      "id": "node-006",
+      "name": "Team Lookup",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1340, 180]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [
+            {
+              "id": "cond-skip",
+              "leftValue": "={{ $json.skip }}",
+              "rightValue": false,
+              "operator": { "type": "boolean", "operation": "equal" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "node-007",
+      "name": "Team in Config?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1560, 180]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.football-data.org/v4/teams/{{$json.teamId}}/matches",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Auth-Token", "value": "={{ $vars.FOOTBALL_DATA_API_KEY }}" }
+          ]
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "status", "value": "SCHEDULED" },
+            { "name": "limit",  "value": "1" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-008",
+      "name": "Fetch Next Match",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1780, 80]
+    },
+    {
+      "parameters": {
+        "jsCode": "const teamData = $('Team Lookup').first().json;\nconst nextMatchResp = $input.first().json;\nconst nextMatch = (nextMatchResp.matches || [])[0] || null;\nlet nextOpponent = 'TBD', nextMatchDate = null, nextCompetition = 'TBD';\nif (nextMatch) {\n  nextOpponent = nextMatch.homeTeam.id === teamData.teamId\n    ? nextMatch.awayTeam.name\n    : nextMatch.homeTeam.name;\n  nextMatchDate = nextMatch.utcDate;\n  nextCompetition = nextMatch.competition?.name || 'TBD';\n}\nconst { goalsFor, goalsAgainst } = teamData;\nconst result = goalsFor > goalsAgainst ? 'WIN' : goalsFor < goalsAgainst ? 'LOSS' : 'DRAW';\nreturn [{ json: { ...teamData, result, nextOpponent, nextMatchDate, nextCompetition } }];"
+      },
+      "id": "node-009",
+      "name": "Build Match Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2000, 80]
+    },
+    {
+      "parameters": {
+        "jsCode": "const d = $input.first().json;\nconst venue = d.isHome ? 'at home' : 'away';\nlet nextFixture = 'No upcoming match currently scheduled.';\nif (d.nextMatchDate) {\n  const dt = new Date(d.nextMatchDate);\n  const formatted = dt.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });\n  nextFixture = 'Next up: ' + d.nextOpponent + ' (' + d.nextCompetition + ') on ' + formatted + '.';\n}\nconst promptLines = [\n  'You are updating the website for ' + d.teamName + '.',\n  '',\n  'Latest result:',\n  '- Competition: ' + d.competition,\n  '- Venue: ' + venue,\n  '- Score: ' + d.teamName + ' ' + d.goalsFor + '-' + d.goalsAgainst + ' ' + d.opponentName,\n  '- Outcome: ' + d.result,\n  '- Group/Region: ' + d.group,\n  '',\n  'Upcoming fixture:',\n  nextFixture,\n  '',\n  \"Write a punchy, supporter-facing 2-3 sentence update for the team's website. Requirements:\",\n  '1. Open with the result and score',\n  '2. Capture the mood (winning energy, resilience, or fighting spirit)',\n  '3. Close with the next fixture to keep fans engaged',\n  '',\n  'Return ONLY plain text - no HTML, no markdown, no quotes.'\n];\nconst prompt = promptLines.join('\\n');\nconst claudeBody = {\n  model: 'claude-sonnet-4-6',\n  max_tokens: 256,\n  messages: [{ role: 'user', content: prompt }]\n};\nreturn [{ json: { ...d, prompt, claudeBody } }];"
+      },
+      "id": "node-010",
+      "name": "Build Claude Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2220, 80]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-key",          "value": "={{ $vars.CLAUDE_API_KEY }}" },
+            { "name": "anthropic-version",  "value": "2023-06-01" },
+            { "name": "content-type",       "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.claudeBody }}",
+        "options": {}
+      },
+      "id": "node-011",
+      "name": "Claude API Call",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2440, 80]
+    },
+    {
+      "parameters": {
+        "jsCode": "const claudeResp = $input.first().json;\nconst promptData = $('Build Claude Prompt').first().json;\nconst generatedContent = claudeResp.content?.[0]?.text?.trim() || '';\nif (!generatedContent) {\n  throw new Error('Claude returned empty content for ' + promptData.teamName);\n}\nreturn [{ json: { ...promptData, generatedContent } }];"
+      },
+      "id": "node-012",
+      "name": "Parse Claude Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2660, 80]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{$vars.WORDPRESS_URL}}/wp-json/wp/v2/posts/{{$json.postId}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Basic {{$vars.WORDPRESS_AUTH_BASE64}}" }
+          ]
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [{ "name": "context", "value": "edit" }]
+        },
+        "options": {}
+      },
+      "id": "node-013",
+      "name": "GET WordPress Post",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2880, 80]
+    },
+    {
+      "parameters": {
+        "jsCode": "const wpPost = $input.first().json;\nconst teamData = $('Parse Claude Response').first().json;\nconst rawContent = wpPost.content?.raw || '';\nconst newText = teamData.generatedContent;\nconst START_MARKER = '<!-- wp:paragraph {\"className\":\"match-update\"} -->';\nconst OPEN_P = '<p class=\"match-update\">';\nconst CLOSE_P = '</p>';\nconst END_MARKER = '<!-- /wp:paragraph -->';\nlet updatedContent;\nconst startIdx = rawContent.indexOf(START_MARKER);\nif (startIdx !== -1) {\n  const openPIdx = rawContent.indexOf(OPEN_P, startIdx);\n  const closePIdx = rawContent.indexOf(CLOSE_P, openPIdx + OPEN_P.length);\n  if (openPIdx !== -1 && closePIdx !== -1) {\n    updatedContent = rawContent.substring(0, openPIdx + OPEN_P.length) + newText + rawContent.substring(closePIdx);\n  } else {\n    updatedContent = rawContent;\n  }\n} else {\n  updatedContent = rawContent + '\\n\\n' + START_MARKER + '\\n' + OPEN_P + newText + CLOSE_P + '\\n' + END_MARKER;\n}\nconst wpBody = { content: updatedContent };\nreturn [{ json: { ...teamData, updatedContent, postSlug: wpPost.slug, wpBody } }];"
+      },
+      "id": "node-014",
+      "name": "Find and Replace Block Content",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3100, 80]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{$vars.WORDPRESS_URL}}/wp-json/wp/v2/posts/{{$json.postId}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Basic {{$vars.WORDPRESS_AUTH_BASE64}}" },
+            { "name": "Content-Type",  "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.wpBody }}",
+        "options": {}
+      },
+      "id": "node-015",
+      "name": "PATCH WordPress Post",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3320, 80]
+    },
+    {
+      "parameters": {
+        "jsCode": "const d = $('Find and Replace Block Content').first().json;\nconst ts = new Date().toISOString();\nconsole.log('[' + ts + '] OK | ' + d.teamName + ' | post ' + d.postId + ' | ' + d.result + ' ' + d.goalsFor + '-' + d.goalsAgainst + ' vs ' + d.opponentName);\nreturn [{ json: { success: true, timestamp: ts, team: d.teamName, postId: d.postId, result: d.result + ' ' + d.goalsFor + '-' + d.goalsAgainst, opponent: d.opponentName, competition: d.competition } }];"
+      },
+      "id": "node-016",
+      "name": "Log Success",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3540, 80]
+    },
+    {
+      "parameters": {},
+      "id": "node-017",
+      "name": "No Matches - Stop",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [900, 440]
+    },
+    {
+      "parameters": {},
+      "id": "node-018",
+      "name": "All Teams Processed",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1120, 440]
+    },
+    {
+      "parameters": {},
+      "id": "node-019",
+      "name": "Skip - Not in Config",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1780, 340]
+    },
+    {
+      "parameters": {
+        "content": "## SETUP — Read Before Activating\n\n### 1. n8n Variables (Settings → Variables)\n\n| Variable | Value |\n|---|---|\n| `FOOTBALL_DATA_API_KEY` | Key from football-data.org |\n| `COMPETITION_ID` | `PL` Premier League · `CL` Champions League · `PD` La Liga · `BL1` Bundesliga · `SA` Serie A · `FL1` Ligue 1 |\n| `CLAUDE_API_KEY` | Anthropic key from console.anthropic.com |\n| `WORDPRESS_URL` | e.g. `https://yoursite.com` — no trailing slash |\n| `WORDPRESS_AUTH_BASE64` | `base64(username:app_password)` — generate at yoursite.com/wp-admin → Users → Application Passwords |\n\n### 2. Team Map\nEdit the **Team Lookup** Code node. Replace the example entries with your actual team names (exactly as returned by football-data.org) and their WordPress post IDs. See `team-config.json` in this repo.\n\n### 3. WordPress Block Target\nThis workflow targets `<p class=\"match-update\">` Gutenberg blocks. In each team page, add the CSS class `match-update` to the paragraph block you want updated (Block → Advanced → Additional CSS class). If none exists, the workflow appends a new block.\n\n### 4. Test First\nUse **Test Workflow** before activating. Inspect each node's output in the execution log.",
+        "height": 500,
+        "width": 600,
+        "color": 4
+      },
+      "id": "node-020",
+      "name": "Setup Instructions",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [240, 520]
+    }
+  ],
+  "connections": {
+    "Poll Every 30 Minutes": {
+      "main": [[{ "node": "Fetch Finished Matches", "type": "main", "index": 0 }]]
+    },
+    "Fetch Finished Matches": {
+      "main": [[{ "node": "Any Matches Finished?", "type": "main", "index": 0 }]]
+    },
+    "Any Matches Finished?": {
+      "main": [
+        [{ "node": "Extract Teams From Matches", "type": "main", "index": 0 }],
+        [{ "node": "No Matches - Stop",          "type": "main", "index": 0 }]
+      ]
+    },
+    "Extract Teams From Matches": {
+      "main": [[{ "node": "Loop: Split Teams", "type": "main", "index": 0 }]]
+    },
+    "Loop: Split Teams": {
+      "main": [
+        [{ "node": "Team Lookup",         "type": "main", "index": 0 }],
+        [{ "node": "All Teams Processed", "type": "main", "index": 0 }]
+      ]
+    },
+    "Team Lookup": {
+      "main": [[{ "node": "Team in Config?", "type": "main", "index": 0 }]]
+    },
+    "Team in Config?": {
+      "main": [
+        [{ "node": "Fetch Next Match",      "type": "main", "index": 0 }],
+        [{ "node": "Skip - Not in Config",  "type": "main", "index": 0 }]
+      ]
+    },
+    "Skip - Not in Config": {
+      "main": [[{ "node": "Loop: Split Teams", "type": "main", "index": 0 }]]
+    },
+    "Fetch Next Match": {
+      "main": [[{ "node": "Build Match Context", "type": "main", "index": 0 }]]
+    },
+    "Build Match Context": {
+      "main": [[{ "node": "Build Claude Prompt", "type": "main", "index": 0 }]]
+    },
+    "Build Claude Prompt": {
+      "main": [[{ "node": "Claude API Call", "type": "main", "index": 0 }]]
+    },
+    "Claude API Call": {
+      "main": [[{ "node": "Parse Claude Response", "type": "main", "index": 0 }]]
+    },
+    "Parse Claude Response": {
+      "main": [[{ "node": "GET WordPress Post", "type": "main", "index": 0 }]]
+    },
+    "GET WordPress Post": {
+      "main": [[{ "node": "Find and Replace Block Content", "type": "main", "index": 0 }]]
+    },
+    "Find and Replace Block Content": {
+      "main": [[{ "node": "PATCH WordPress Post", "type": "main", "index": 0 }]]
+    },
+    "PATCH WordPress Post": {
+      "main": [[{ "node": "Log Success", "type": "main", "index": 0 }]]
+    },
+    "Log Success": {
+      "main": [[{ "node": "Loop: Split Teams", "type": "main", "index": 0 }]]
+    }
+  },
+  "pinData": {},
+  "settings": { "executionOrder": "v1" },
+  "staticData": null,
+  "tags": [
+    { "name": "football" },
+    { "name": "wordpress" },
+    { "name": "auto-update" }
+  ],
+  "triggerCount": 0,
+  "versionId": "1"
+}

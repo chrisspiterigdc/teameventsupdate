@@ -1,0 +1,17 @@
+{
+  "_notes": {
+    "competitionIds": "PL=Premier League, CL=Champions League, PD=La Liga, BL1=Bundesliga, SA=Serie A, FL1=Ligue 1, EC=Euros, WC=World Cup",
+    "teamNames": "Team names must exactly match what football-data.org returns. Run the workflow once and inspect the Fetch Finished Matches output to confirm exact names.",
+    "postIds": "Find WordPress post IDs in wp-admin: hover over Edit for a post and read the ?post= value in the URL, or use the REST API: /wp-json/wp/v2/posts?search=TeamName",
+    "wordpressAuth": "Generate an Application Password at yoursite.com/wp-admin > Users > Your Profile > Application Passwords. Then base64-encode username:app_password (e.g. in terminal: echo -n 'admin:xxxx xxxx xxxx' | base64)"
+  },
+  "competitionId": "PL",
+  "teams": {
+    "Manchester United FC": { "postId": 101, "group": "Group A" },
+    "Arsenal FC":           { "postId": 102, "group": "Group B" },
+    "Chelsea FC":           { "postId": 103, "group": "Group B" },
+    "Liverpool FC":         { "postId": 104, "group": "Group A" },
+    "Manchester City FC":   { "postId": 105, "group": "Group A" },
+    "Tottenham Hotspur FC": { "postId": 106, "group": "Group C" }
+  }
+}
