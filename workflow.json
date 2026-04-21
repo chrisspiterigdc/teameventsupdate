@@ -14,21 +14,20 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "https://v3.football.api-sports.io/fixtures",
+        "url": "https://api.opticodds.com/api/v3/fixtures/results",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "x-apisports-key", "value": "={{ $vars.APISPORTS_KEY }}" }
+            { "name": "X-Api-Key", "value": "={{ $vars.OPTICODDS_KEY }}" }
           ]
         },
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
-            { "name": "league", "value": "={{ $vars.LEAGUE_ID }}" },
-            { "name": "season", "value": "={{ $vars.SEASON }}" },
-            { "name": "status", "value": "FT" },
-            { "name": "from",   "value": "={{ DateTime.now().toFormat('yyyy-MM-dd') }}" },
-            { "name": "to",     "value": "={{ DateTime.now().toFormat('yyyy-MM-dd') }}" }
+            { "name": "sport",      "value": "soccer" },
+            { "name": "league",     "value": "={{ $vars.LEAGUE_SLUG }}" },
+            { "name": "start_date", "value": "={{ DateTime.now().toFormat('yyyy-MM-dd') }}" },
+            { "name": "end_date",   "value": "={{ DateTime.now().toFormat('yyyy-MM-dd') }}" }
           ]
         },
         "options": {}
@@ -46,7 +45,7 @@
           "conditions": [
             {
               "id": "cond-matches",
-              "leftValue": "={{ ($json.response || []).length }}",
+              "leftValue": "={{ ($json.data || []).length }}",
               "rightValue": 0,
               "operator": { "type": "number", "operation": "gt" }
             }
@@ -63,7 +62,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const fixtures = $input.first().json.response || [];\nconst teams = [];\nfor (const fixture of fixtures) {\n  const status = fixture.fixture?.status?.short;\n  if (status !== 'FT' && status !== 'AET' && status !== 'PEN') continue;\n  const homeScore = fixture.goals?.home ?? 0;\n  const awayScore = fixture.goals?.away ?? 0;\n  teams.push({\n    teamId: fixture.teams.home.id,\n    teamName: fixture.teams.home.name,\n    opponentName: fixture.teams.away.name,\n    isHome: true,\n    goalsFor: homeScore,\n    goalsAgainst: awayScore,\n    matchId: fixture.fixture.id,\n    matchDate: fixture.fixture.date,\n    competition: fixture.league.name\n  });\n  teams.push({\n    teamId: fixture.teams.away.id,\n    teamName: fixture.teams.away.name,\n    opponentName: fixture.teams.home.name,\n    isHome: false,\n    goalsFor: awayScore,\n    goalsAgainst: homeScore,\n    matchId: fixture.fixture.id,\n    matchDate: fixture.fixture.date,\n    competition: fixture.league.name\n  });\n}\nreturn teams.map(t => ({ json: t }));"
+        "jsCode": "// NOTE: verify field names against your first live API response.\n// OpticOdds may use home_score/away_score or score.home/score.away depending on endpoint version.\nconst fixtures = $input.first().json.data || [];\nconst teams = [];\nfor (const fixture of fixtures) {\n  const homeScore = fixture.home_score ?? fixture.score?.home ?? fixture.scores?.home ?? 0;\n  const awayScore = fixture.away_score ?? fixture.score?.away ?? fixture.scores?.away ?? 0;\n  const homeName = fixture.home_team_display || fixture.home_team;\n  const awayName = fixture.away_team_display || fixture.away_team;\n  const homeId   = fixture.home_team_id   || fixture.home_team;\n  const awayId   = fixture.away_team_id   || fixture.away_team;\n  teams.push({\n    teamId: homeId,\n    teamName: homeName,\n    opponentName: awayName,\n    isHome: true,\n    goalsFor: homeScore,\n    goalsAgainst: awayScore,\n    matchId: fixture.id,\n    matchDate: fixture.start_date,\n    competition: fixture.league\n  });\n  teams.push({\n    teamId: awayId,\n    teamName: awayName,\n    opponentName: homeName,\n    isHome: false,\n    goalsFor: awayScore,\n    goalsAgainst: homeScore,\n    matchId: fixture.id,\n    matchDate: fixture.start_date,\n    competition: fixture.league\n  });\n}\nreturn teams.map(t => ({ json: t }));"
       },
       "id": "node-004",
       "name": "Extract Teams From Matches",
@@ -81,7 +80,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// CONFIGURE: map api-sports team names to post IDs + groups.\n// Names must exactly match what api-sports returns — check Extract Teams output to confirm.\n// apisportsId values are for reference only (the API returns names, not IDs, in team name fields).\n// See team-config.json in this repo for common Premier League IDs.\nconst TEAM_MAP = {\n  // \"Exact Team Name\": { postId: 0, group: \"Group Name\" },\n  \"Manchester United\": { postId: 101, group: \"Group A\" },\n  \"Arsenal\":           { postId: 102, group: \"Group B\" },\n  \"Chelsea\":           { postId: 103, group: \"Group B\" },\n  \"Liverpool\":         { postId: 104, group: \"Group A\" }\n};\nconst data = $input.first().json;\nconst config = TEAM_MAP[data.teamName];\nif (!config) {\n  return [{ json: { ...data, postId: null, skip: true } }];\n}\nreturn [{ json: { ...data, postId: config.postId, group: config.group, skip: false } }];"
+        "jsCode": "// CONFIGURE: map team display names to post IDs + groups.\n// Names must match home_team_display / away_team_display from OpticOdds.\n// Run once, inspect Extract Teams output to confirm exact names, then update this map.\nconst TEAM_MAP = {\n  // \"Exact Team Name\": { postId: 0, group: \"Group Name\" },\n  \"Manchester United\": { postId: 101, group: \"Group A\" },\n  \"Arsenal\":           { postId: 102, group: \"Group B\" },\n  \"Chelsea\":           { postId: 103, group: \"Group B\" },\n  \"Liverpool\":         { postId: 104, group: \"Group A\" }\n};\nconst data = $input.first().json;\nconst config = TEAM_MAP[data.teamName];\nif (!config) {\n  return [{ json: { ...data, postId: null, skip: true } }];\n}\nreturn [{ json: { ...data, postId: config.postId, group: config.group, skip: false } }];"
       },
       "id": "node-006",
       "name": "Team Lookup",
@@ -114,18 +113,20 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "https://v3.football.api-sports.io/fixtures",
+        "url": "https://api.opticodds.com/api/v3/fixtures",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "x-apisports-key", "value": "={{ $vars.APISPORTS_KEY }}" }
+            { "name": "X-Api-Key", "value": "={{ $vars.OPTICODDS_KEY }}" }
           ]
         },
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
-            { "name": "team", "value": "={{ $json.teamId }}" },
-            { "name": "next", "value": "1" }
+            { "name": "sport",      "value": "soccer" },
+            { "name": "team_id",    "value": "={{ $json.teamId }}" },
+            { "name": "start_date", "value": "={{ DateTime.now().toFormat('yyyy-MM-dd') }}" },
+            { "name": "limit",      "value": "1" }
           ]
         },
         "options": {}
@@ -138,7 +139,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const teamData = $('Team Lookup').first().json;\nconst nextMatchResp = $input.first().json;\nconst nextFixtures = nextMatchResp.response || [];\nconst nextFixture = nextFixtures[0] || null;\nlet nextOpponent = 'TBD', nextMatchDate = null, nextCompetition = 'TBD';\nif (nextFixture) {\n  nextOpponent = nextFixture.teams.home.id === teamData.teamId\n    ? nextFixture.teams.away.name\n    : nextFixture.teams.home.name;\n  nextMatchDate = nextFixture.fixture.date;\n  nextCompetition = nextFixture.league?.name || 'TBD';\n}\nconst { goalsFor, goalsAgainst } = teamData;\nconst result = goalsFor > goalsAgainst ? 'WIN' : goalsFor < goalsAgainst ? 'LOSS' : 'DRAW';\nreturn [{ json: { ...teamData, result, nextOpponent, nextMatchDate, nextCompetition } }];"
+        "jsCode": "const teamData = $('Team Lookup').first().json;\nconst nextMatchResp = $input.first().json;\nconst nextFixtures = nextMatchResp.data || [];\nconst nextFixture = nextFixtures[0] || null;\nlet nextOpponent = 'TBD', nextMatchDate = null, nextCompetition = 'TBD';\nif (nextFixture) {\n  const myId = teamData.teamId;\n  const homeId = nextFixture.home_team_id || nextFixture.home_team;\n  const isHome = homeId === myId;\n  nextOpponent = isHome\n    ? (nextFixture.away_team_display || nextFixture.away_team)\n    : (nextFixture.home_team_display || nextFixture.home_team);\n  nextMatchDate = nextFixture.start_date;\n  nextCompetition = nextFixture.league || 'TBD';\n}\nconst { goalsFor, goalsAgainst } = teamData;\nconst result = goalsFor > goalsAgainst ? 'WIN' : goalsFor < goalsAgainst ? 'LOSS' : 'DRAW';\nreturn [{ json: { ...teamData, result, nextOpponent, nextMatchDate, nextCompetition } }];"
       },
       "id": "node-009",
       "name": "Build Match Context",
@@ -240,9 +241,9 @@
     },
     {
       "parameters": {
-        "content": "## SETUP — Read Before Activating\n\n### 1. Variables (hardcode directly in each node if your n8n plan doesn't support Variables)\n\n| Variable | Value |\n|---|---|\n| `APISPORTS_KEY` | Your key from api-sports.io dashboard |\n| `LEAGUE_ID` | `39` Premier League · `2` Champions League · `140` La Liga · `78` Bundesliga · `135` Serie A · `61` Ligue 1 |\n| `SEASON` | Start year of the season, e.g. `2025` for 2025/26 |\n| `CLAUDE_API_KEY` | Anthropic key from console.anthropic.com |\n| `SLACK_WEBHOOK_URL` | Incoming Webhook URL from api.slack.com/apps |\n\n### 2. Team Map\nEdit the **Team Lookup** Code node. Replace examples with your actual team names (as returned by api-sports — check Extract Teams output after a test run) and their post IDs. See `team-config.json` for common PL team IDs.\n\n### 3. Test First\nUse **Test Workflow** before activating. Inspect each node's output in the execution log.",
-        "height": 420,
-        "width": 600,
+        "content": "## SETUP — Read Before Activating\n\n### 1. Variables (hardcode directly in each node if your n8n plan doesn't support Variables)\n\n| Variable | Value |\n|---|---|\n| `OPTICODDS_KEY` | Your key from OpticOdds dashboard |\n| `LEAGUE_SLUG` | League identifier from OpticOdds — call `GET /api/v3/leagues?sport=soccer` to find it |\n| `CLAUDE_API_KEY` | Anthropic key from console.anthropic.com |\n| `SLACK_WEBHOOK_URL` | Incoming Webhook URL from api.slack.com/apps |\n\n### 2. Find Your League Slug\nCall `https://api.opticodds.com/api/v3/leagues?sport=soccer` with your API key. Find your competition in the response and copy its `id` or `slug` field into `LEAGUE_SLUG`.\n\n### 3. Team Map + Exact Names\nDo a test run first. Inspect the **Extract Teams From Matches** node output to see the exact `teamName` values OpticOdds returns. Then update the **Team Lookup** Code node map with those exact names and your post IDs. See `team-config.json` for the structure.\n\n### 4. Score Fields\nIf scores come back as 0-0 on real data, open **Extract Teams From Matches** and check the raw fixture object. Adjust the score field path (`home_score`, `score.home`, etc.) to match what OpticOdds actually returns.",
+        "height": 460,
+        "width": 620,
         "color": 4
       },
       "id": "node-020",
@@ -317,5 +318,5 @@
     { "name": "auto-update" }
   ],
   "triggerCount": 0,
-  "versionId": "3"
+  "versionId": "4"
 }

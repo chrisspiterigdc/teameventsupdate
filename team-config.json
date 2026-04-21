@@ -1,21 +1,16 @@
 {
   "_notes": {
-    "leagueIds": "39=Premier League, 2=Champions League, 140=La Liga, 78=Bundesliga, 135=Serie A, 61=Ligue 1",
-    "season": "Use the start year of the season, e.g. 2025 for the 2025/26 season",
-    "teamNames": "Team names must exactly match what api-sports returns. Run the workflow once and inspect Extract Teams From Matches output to confirm.",
-    "teamIds": "api-sports team IDs differ from football-data.org. Common Premier League IDs listed below.",
-    "postIds": "Find WordPress post IDs in wp-admin: hover over Edit for a post and read ?post= in the URL"
+    "leagueSlug": "Find your league slug by calling GET https://api.opticodds.com/api/v3/leagues?sport=soccer with your API key. Use the 'id' or 'slug' field from the response.",
+    "teamIds": "OpticOdds team IDs come from the fixtures/results response (home_team_id / away_team_id). Run the workflow once, inspect Extract Teams output to get the exact IDs and names, then populate this map.",
+    "teamNames": "Names must match home_team_display / away_team_display exactly as returned by OpticOdds."
   },
-  "leagueId": 39,
-  "season": 2025,
+  "leagueSlug": "english-premier-league",
   "teams": {
-    "Manchester United": { "postId": 101, "apisportsId": 33, "group": "Group A" },
-    "Arsenal":           { "postId": 102, "apisportsId": 42, "group": "Group B" },
-    "Chelsea":           { "postId": 103, "apisportsId": 49, "group": "Group B" },
-    "Liverpool":         { "postId": 104, "apisportsId": 40, "group": "Group A" },
-    "Manchester City":   { "postId": 105, "apisportsId": 50, "group": "Group A" },
-    "Tottenham":         { "postId": 106, "apisportsId": 47, "group": "Group C" },
-    "Newcastle United":  { "postId": 107, "apisportsId": 34, "group": "Group C" },
-    "Aston Villa":       { "postId": 108, "apisportsId": 66, "group": "Group D" }
+    "Manchester United": { "postId": 101, "opticoddsId": "REPLACE_WITH_REAL_ID", "group": "Group A" },
+    "Arsenal":           { "postId": 102, "opticoddsId": "REPLACE_WITH_REAL_ID", "group": "Group B" },
+    "Chelsea":           { "postId": 103, "opticoddsId": "REPLACE_WITH_REAL_ID", "group": "Group B" },
+    "Liverpool":         { "postId": 104, "opticoddsId": "REPLACE_WITH_REAL_ID", "group": "Group A" },
+    "Manchester City":   { "postId": 105, "opticoddsId": "REPLACE_WITH_REAL_ID", "group": "Group A" },
+    "Tottenham":         { "postId": 106, "opticoddsId": "REPLACE_WITH_REAL_ID", "group": "Group C" }
   }
 }
