@@ -1,16 +1,31 @@
 {
   "_notes": {
-    "leagueSlug": "Find your league slug by calling GET https://api.opticodds.com/api/v3/leagues?sport=soccer with your API key. Use the 'id' or 'slug' field from the response.",
-    "teamIds": "OpticOdds team IDs come from the fixtures/results response (home_team_id / away_team_id). Run the workflow once, inspect Extract Teams output to get the exact IDs and names, then populate this map.",
-    "teamNames": "Names must match home_team_display / away_team_display exactly as returned by OpticOdds."
+    "league": "Confirm slug via GET https://api.opticodds.com/api/v3/leagues?sport=soccer",
+    "teamIds": "Get IDs via GET https://api.opticodds.com/api/v3/teams?sport=soccer&league=english-premier-league",
+    "teamNames": "Names in Get Configured Teams node must match exactly what OpticOdds returns in home_team_display / away_team_display"
   },
   "leagueSlug": "english-premier-league",
-  "teams": {
-    "Manchester United": { "postId": 101, "opticoddsId": "REPLACE_WITH_REAL_ID", "group": "Group A" },
-    "Arsenal":           { "postId": 102, "opticoddsId": "REPLACE_WITH_REAL_ID", "group": "Group B" },
-    "Chelsea":           { "postId": 103, "opticoddsId": "REPLACE_WITH_REAL_ID", "group": "Group B" },
-    "Liverpool":         { "postId": 104, "opticoddsId": "REPLACE_WITH_REAL_ID", "group": "Group A" },
-    "Manchester City":   { "postId": 105, "opticoddsId": "REPLACE_WITH_REAL_ID", "group": "Group A" },
-    "Tottenham":         { "postId": 106, "opticoddsId": "REPLACE_WITH_REAL_ID", "group": "Group C" }
-  }
+  "season": "2025-26",
+  "teams": [
+    { "teamName": "Arsenal",                 "postId": 101, "opticoddsId": "REPLACE_WITH_REAL_ID" },
+    { "teamName": "Aston Villa",             "postId": 102, "opticoddsId": "REPLACE_WITH_REAL_ID" },
+    { "teamName": "Bournemouth",             "postId": 103, "opticoddsId": "REPLACE_WITH_REAL_ID" },
+    { "teamName": "Brentford",               "postId": 104, "opticoddsId": "REPLACE_WITH_REAL_ID" },
+    { "teamName": "Brighton",                "postId": 105, "opticoddsId": "REPLACE_WITH_REAL_ID" },
+    { "teamName": "Chelsea",                 "postId": 106, "opticoddsId": "REPLACE_WITH_REAL_ID" },
+    { "teamName": "Crystal Palace",          "postId": 107, "opticoddsId": "REPLACE_WITH_REAL_ID" },
+    { "teamName": "Everton",                 "postId": 108, "opticoddsId": "REPLACE_WITH_REAL_ID" },
+    { "teamName": "Fulham",                  "postId": 109, "opticoddsId": "REPLACE_WITH_REAL_ID" },
+    { "teamName": "Ipswich Town",            "postId": 110, "opticoddsId": "REPLACE_WITH_REAL_ID" },
+    { "teamName": "Leicester City",          "postId": 111, "opticoddsId": "REPLACE_WITH_REAL_ID" },
+    { "teamName": "Liverpool",               "postId": 112, "opticoddsId": "REPLACE_WITH_REAL_ID" },
+    { "teamName": "Manchester City",         "postId": 113, "opticoddsId": "REPLACE_WITH_REAL_ID" },
+    { "teamName": "Manchester United",       "postId": 114, "opticoddsId": "REPLACE_WITH_REAL_ID" },
+    { "teamName": "Newcastle United",        "postId": 115, "opticoddsId": "REPLACE_WITH_REAL_ID" },
+    { "teamName": "Nottingham Forest",       "postId": 116, "opticoddsId": "REPLACE_WITH_REAL_ID" },
+    { "teamName": "Southampton",             "postId": 117, "opticoddsId": "REPLACE_WITH_REAL_ID" },
+    { "teamName": "Tottenham Hotspur",       "postId": 118, "opticoddsId": "REPLACE_WITH_REAL_ID" },
+    { "teamName": "West Ham United",         "postId": 119, "opticoddsId": "REPLACE_WITH_REAL_ID" },
+    { "teamName": "Wolverhampton Wanderers", "postId": 120, "opticoddsId": "REPLACE_WITH_REAL_ID" }
+  ]
 }
