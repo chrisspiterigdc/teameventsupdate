@@ -130,15 +130,25 @@ def generate_team_news(team: str, match: dict, client: anthropic.Anthropic) -> s
     )
 
     prompt = (
-        f"Write a short 'Latest {team} News' blurb for a football betting information website. "
-        f"Base it on this result: {team} {('won' if result == 'win' else 'drew' if result == 'draw' else 'lost')} "
-        f"{team_goals}-{opp_goals} {venue} to {opponent} (HT: {ht_h if is_home else ht_a}-{ht_a if is_home else ht_h}). "
-        f"{context_block}"
-        "Write 2-3 short paragraphs in a neutral, journalistic third-person tone — like an editor summarising "
-        "the team's recent situation for someone visiting their team page. Cover the result, then the league-table "
-        "implications (use the league context above — name the current position, points, and any European "
-        "qualification angle), and end with a forward-looking note about the run-in. "
-        "Do not use headers, bullet points, emoji, or first-person language. Plain prose only."
+        f"Write a 'Latest {team} News' blurb for a football betting information website, "
+        f"in the style of the example below.\n\n"
+        "EXAMPLE (Brighton, 3-0 win vs Chelsea):\n"
+        "Brighton's 3-0 win over Chelsea wasn't just a statement result - it saw them leapfrog "
+        "their opponents in the Premier League table and firmly strengthen their push for European qualification.\n"
+        "Leading at the break and dominant throughout, the Seagulls showed they belong in the conversation for a top-seven finish.\n"
+        "Fabian Hürzeler's side continues to impress with their attacking structure and composure, "
+        "and a clean sheet against a direct rival boosts their credentials further.\n"
+        "With momentum on their side and confidence growing, Brighton are right in the mix for Europe, "
+        "and look well equipped to stay there as we reach the business end of the season.\n\n"
+        "NOW WRITE FOR:\n"
+        f"Team: {team}\n"
+        f"Result: {('won' if result == 'win' else 'drew' if result == 'draw' else 'lost')} "
+        f"{team_goals}-{opp_goals} {venue} vs {opponent} (HT: {ht_h if is_home else ht_a}-{ht_a if is_home else ht_h})\n"
+        f"Context: {team_context}\n\n"
+        "Style rules: short punchy sentences, narrative-led not stat-led, present tense, "
+        "optimistic or honest depending on result, 3-4 short paragraphs of 1-2 sentences each. "
+        "Weave in the table/European angle naturally — don't list raw points totals. "
+        "Use the team's common short name. No headers, bullets, emoji, or first-person language."
     )
     msg = client.messages.create(
         model="claude-opus-4-7",
