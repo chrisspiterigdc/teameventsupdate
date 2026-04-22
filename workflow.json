@@ -13,6 +13,24 @@
     },
     {
       "parameters": {
+        "jsCode": "// CONFIGURE: replace opticoddsId values.\n// Get IDs from: GET https://api.opticodds.com/api/v3/teams?sport=soccer&league=<your-league>\nconst TEAM_MAP = [\n  { teamName: \"Manchester United\", postId: 101, opticoddsId: \"REPLACE_WITH_REAL_ID\", group: \"Group A\" },\n  { teamName: \"Arsenal\",           postId: 102, opticoddsId: \"REPLACE_WITH_REAL_ID\", group: \"Group B\" },\n  { teamName: \"Chelsea\",           postId: 103, opticoddsId: \"REPLACE_WITH_REAL_ID\", group: \"Group B\" },\n  { teamName: \"Liverpool\",         postId: 104, opticoddsId: \"REPLACE_WITH_REAL_ID\", group: \"Group A\" },\n  { teamName: \"Manchester City\",   postId: 105, opticoddsId: \"REPLACE_WITH_REAL_ID\", group: \"Group A\" },\n  { teamName: \"Tottenham\",         postId: 106, opticoddsId: \"REPLACE_WITH_REAL_ID\", group: \"Group C\" }\n];\nreturn TEAM_MAP.map(t => ({ json: t }));"
+      },
+      "id": "node-022",
+      "name": "Get Configured Teams",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": { "batchSize": 1, "options": {} },
+      "id": "node-005",
+      "name": "Loop: Split Teams",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
         "method": "GET",
         "url": "https://api.opticodds.com/api/v3/fixtures/results",
         "sendHeaders": true,
@@ -25,7 +43,7 @@
         "queryParameters": {
           "parameters": [
             { "name": "sport",      "value": "soccer" },
-            { "name": "league",     "value": "={{ $vars.LEAGUE_SLUG }}" },
+            { "name": "team_id",    "value": "={{ $json.opticoddsId }}" },
             { "name": "start_date", "value": "={{ DateTime.now().toFormat('yyyy-MM-dd') }}" },
             { "name": "end_date",   "value": "={{ DateTime.now().toFormat('yyyy-MM-dd') }}" }
           ]
@@ -33,10 +51,10 @@
         "options": {}
       },
       "id": "node-002",
-      "name": "Fetch Finished Matches",
+      "name": "Fetch Team Results",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [460, 300]
+      "position": [900, 200]
     },
     {
       "parameters": {
@@ -55,60 +73,20 @@
         "options": {}
       },
       "id": "node-003",
-      "name": "Any Matches Finished?",
+      "name": "Any Match Today?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [680, 300]
+      "position": [1120, 200]
     },
     {
       "parameters": {
-        "jsCode": "const fixtures = $input.first().json.data || [];\nconst teams = [];\nfor (const fixture of fixtures) {\n  const f = fixture.fixture || {};\n  const homeScore = fixture.scores?.home?.total ?? 0;\n  const awayScore = fixture.scores?.away?.total ?? 0;\n  const homeId   = f.home_competitors?.[0]?.id;\n  const awayId   = f.away_competitors?.[0]?.id;\n  const homeName = f.home_team_display || f.home_competitors?.[0]?.name;\n  const awayName = f.away_team_display || f.away_competitors?.[0]?.name;\n  const events   = fixture.events || [];\n  const homeStats = (fixture.stats?.home || []).find(s => s.period === 'all')?.stats || {};\n  const awayStats = (fixture.stats?.away || []).find(s => s.period === 'all')?.stats || {};\n  const competition = fixture.league?.name || fixture.league?.id || '';\n  teams.push({ teamId: homeId, teamName: homeName, opponentName: awayName, opponentId: awayId, isHome: true,  goalsFor: homeScore, goalsAgainst: awayScore, matchId: f.id, matchDate: f.start_date, competition, events, myStats: homeStats, oppStats: awayStats });\n  teams.push({ teamId: awayId, teamName: awayName, opponentName: homeName, opponentId: homeId, isHome: false, goalsFor: awayScore, goalsAgainst: homeScore, matchId: f.id, matchDate: f.start_date, competition, events, myStats: awayStats, oppStats: homeStats });\n}\nreturn teams.map(t => ({ json: t }));"
+        "jsCode": "const teamInfo = $('Loop: Split Teams').first().json;\nconst fixtureResp = $input.first().json;\nconst fixture = (fixtureResp.data || [])[0];\nif (!fixture) return [{ json: { ...teamInfo, skip: true } }];\nconst f = fixture.fixture || {};\nconst homeId = f.home_competitors?.[0]?.id;\nconst isHome = homeId === teamInfo.opticoddsId;\nconst homeScore = fixture.scores?.home?.total ?? 0;\nconst awayScore = fixture.scores?.away?.total ?? 0;\nconst goalsFor     = isHome ? homeScore : awayScore;\nconst goalsAgainst = isHome ? awayScore : homeScore;\nconst opponentName = isHome\n  ? (f.away_team_display || f.away_competitors?.[0]?.name || 'Unknown')\n  : (f.home_team_display || f.home_competitors?.[0]?.name || 'Unknown');\nconst opponentId = isHome ? f.away_competitors?.[0]?.id : f.home_competitors?.[0]?.id;\nconst events   = fixture.events || [];\nconst myStats  = ((isHome ? fixture.stats?.home : fixture.stats?.away) || []).find(s => s.period === 'all')?.stats || {};\nconst oppStats = ((isHome ? fixture.stats?.away : fixture.stats?.home) || []).find(s => s.period === 'all')?.stats || {};\nconst competition = fixture.league?.name || fixture.league?.id || '';\nreturn [{ json: { ...teamInfo, teamId: teamInfo.opticoddsId, opponentName, opponentId, isHome, goalsFor, goalsAgainst, matchId: f.id, matchDate: f.start_date, competition, events, myStats, oppStats } }];"
       },
       "id": "node-004",
-      "name": "Extract Teams From Matches",
+      "name": "Extract Match Data",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [900, 180]
-    },
-    {
-      "parameters": { "batchSize": 1, "options": {} },
-      "id": "node-005",
-      "name": "Loop: Split Teams",
-      "type": "n8n-nodes-base.splitInBatches",
-      "typeVersion": 3,
-      "position": [1120, 180]
-    },
-    {
-      "parameters": {
-        "jsCode": "// CONFIGURE: map team display names to post IDs + groups.\n// Names must match home_team_display / away_team_display from OpticOdds exactly.\n// Do a test run first and inspect Extract Teams output to confirm the exact strings.\nconst TEAM_MAP = {\n  // \"Exact Team Name\": { postId: 0, group: \"Group Name\" },\n  \"Manchester United\": { postId: 101, group: \"Group A\" },\n  \"Arsenal\":           { postId: 102, group: \"Group B\" },\n  \"Chelsea\":           { postId: 103, group: \"Group B\" },\n  \"Liverpool\":         { postId: 104, group: \"Group A\" }\n};\nconst data = $input.first().json;\nconst config = TEAM_MAP[data.teamName];\nif (!config) {\n  return [{ json: { ...data, postId: null, skip: true } }];\n}\nreturn [{ json: { ...data, postId: config.postId, group: config.group, skip: false } }];"
-      },
-      "id": "node-006",
-      "name": "Team Lookup",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [1340, 180]
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
-          "conditions": [
-            {
-              "id": "cond-skip",
-              "leftValue": "={{ $json.skip }}",
-              "rightValue": false,
-              "operator": { "type": "boolean", "operation": "equal" }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "id": "node-007",
-      "name": "Team in Config?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
-      "position": [1560, 180]
+      "position": [1340, 80]
     },
     {
       "parameters": {
@@ -125,7 +103,7 @@
           "parameters": [
             { "name": "sport",      "value": "soccer" },
             { "name": "team_id",    "value": "={{ $json.teamId }}" },
-            { "name": "start_date", "value": "={{ DateTime.now().toFormat('yyyy-MM-dd') }}" },
+            { "name": "start_date", "value": "={{ DateTime.now().plus({days:1}).toFormat('yyyy-MM-dd') }}" },
             { "name": "limit",      "value": "1" }
           ]
         },
@@ -135,7 +113,7 @@
       "name": "Fetch Next Match",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1780, 80]
+      "position": [1560, 80]
     },
     {
       "parameters": {
@@ -151,8 +129,7 @@
         "queryParameters": {
           "parameters": [
             { "name": "sport",   "value": "soccer" },
-            { "name": "league",  "value": "={{ $vars.LEAGUE_SLUG }}" },
-            { "name": "team_id", "value": "={{ $('Team Lookup').first().json.teamId }}" }
+            { "name": "team_id", "value": "={{ $('Extract Match Data').first().json.teamId }}" }
           ]
         },
         "options": {}
@@ -161,27 +138,27 @@
       "name": "Fetch Team Injuries",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2000, 80]
+      "position": [1780, 80]
     },
     {
       "parameters": {
-        "jsCode": "const teamData = $('Team Lookup').first().json;\nconst nextMatchResp = $('Fetch Next Match').first().json;\nconst injuriesResp = $input.first().json;\n\nconst nextFixtures = nextMatchResp.data || [];\nconst nextFixture = nextFixtures[0] || null;\nlet nextOpponent = 'TBD', nextMatchDate = null, nextCompetition = 'TBD';\nif (nextFixture) {\n  const nf = nextFixture.fixture || {};\n  const homeId = nf.home_competitors?.[0]?.id;\n  const isHome = homeId === teamData.teamId;\n  nextOpponent = isHome\n    ? (nf.away_team_display || nf.away_competitors?.[0]?.name || 'TBD')\n    : (nf.home_team_display || nf.home_competitors?.[0]?.name || 'TBD');\n  nextMatchDate = nf.start_date;\n  nextCompetition = nextFixture.league?.name || 'TBD';\n}\n\nconst injuries = (injuriesResp.data || [])\n  .filter(inj => inj.player?.name)\n  .slice(0, 5)\n  .map(inj => ({ name: inj.player.name, position: inj.player.position || '', status: inj.status, type: inj.type }));\n\nconst goalEvents = (teamData.events || []).filter(e => {\n  const t = (e.type || e.event_type || '').toLowerCase();\n  return t.includes('goal') && (e.team_id === teamData.teamId || e.competitor_id === teamData.teamId);\n});\nconst goalScorers = goalEvents.map(e => e.player_name || e.player?.name).filter(Boolean);\n\nconst { goalsFor, goalsAgainst } = teamData;\nconst result = goalsFor > goalsAgainst ? 'WIN' : goalsFor < goalsAgainst ? 'LOSS' : 'DRAW';\nreturn [{ json: { ...teamData, result, nextOpponent, nextMatchDate, nextCompetition, injuries, goalScorers } }];"
+        "jsCode": "const teamData = $('Extract Match Data').first().json;\nconst nextMatchResp = $('Fetch Next Match').first().json;\nconst injuriesResp = $input.first().json;\n\nconst nextFixtures = nextMatchResp.data || [];\nconst nextFixture = nextFixtures[0] || null;\nlet nextOpponent = 'TBD', nextMatchDate = null, nextCompetition = 'TBD';\nif (nextFixture) {\n  const nf = nextFixture.fixture || {};\n  const homeId = nf.home_competitors?.[0]?.id;\n  const isHome = homeId === teamData.teamId;\n  nextOpponent = isHome\n    ? (nf.away_team_display || nf.away_competitors?.[0]?.name || 'TBD')\n    : (nf.home_team_display || nf.home_competitors?.[0]?.name || 'TBD');\n  nextMatchDate = nf.start_date;\n  nextCompetition = nextFixture.league?.name || 'TBD';\n}\n\nconst injuries = (injuriesResp.data || [])\n  .filter(inj => inj.player?.name)\n  .slice(0, 5)\n  .map(inj => ({ name: inj.player.name, position: inj.player.position || '', status: inj.status, type: inj.type }));\n\nconst goalEvents = (teamData.events || []).filter(e => {\n  const t = (e.type || e.event_type || '').toLowerCase();\n  return t.includes('goal') && (e.team_id === teamData.teamId || e.competitor_id === teamData.teamId);\n});\nconst goalScorers = goalEvents.map(e => e.player_name || e.player?.name).filter(Boolean);\n\nconst { goalsFor, goalsAgainst } = teamData;\nconst result = goalsFor > goalsAgainst ? 'WIN' : goalsFor < goalsAgainst ? 'LOSS' : 'DRAW';\nreturn [{ json: { ...teamData, result, nextOpponent, nextMatchDate, nextCompetition, injuries, goalScorers } }];"
       },
       "id": "node-009",
       "name": "Build Match Context",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2220, 80]
+      "position": [2000, 80]
     },
     {
       "parameters": {
-        "jsCode": "const d = $input.first().json;\nconst venue = d.isHome ? 'at home' : 'away';\nlet nextFixtureText = 'No upcoming match currently scheduled.';\nif (d.nextMatchDate) {\n  const dt = new Date(d.nextMatchDate);\n  const formatted = dt.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });\n  nextFixtureText = 'Next: ' + d.nextOpponent + ' (' + d.nextCompetition + ') — ' + formatted;\n}\nconst lines = [\n  'Update the website for ' + d.teamName + '.',\n  '',\n  'MATCH:',\n  '- ' + d.competition + ' | ' + (d.isHome ? 'Home' : 'Away') + ' vs ' + d.opponentName,\n  '- Result: ' + d.result + ' ' + d.goalsFor + '-' + d.goalsAgainst\n];\nif (d.goalScorers && d.goalScorers.length > 0) {\n  lines.push('- Goals: ' + d.goalScorers.join(', '));\n}\nif (d.myStats && Object.keys(d.myStats).length > 0) {\n  const s = d.myStats;\n  const parts = [];\n  if (s.shots !== undefined) parts.push('Shots ' + s.shots + (s.shots_on_target !== undefined ? ' (' + s.shots_on_target + ' on target)' : ''));\n  if (s.possession !== undefined) parts.push('Possession ' + s.possession + '%');\n  if (s.corners !== undefined) parts.push('Corners ' + s.corners);\n  if (parts.length > 0) lines.push('- Stats: ' + parts.join(' | '));\n}\nlines.push('', 'GROUP: ' + d.group, '', 'NEXT MATCH: ' + nextFixtureText);\nif (d.injuries && d.injuries.length > 0) {\n  lines.push('', 'INJURY LIST:');\n  d.injuries.forEach(inj => {\n    lines.push('- ' + inj.name + (inj.position ? ' (' + inj.position + ')' : '') + ': ' + inj.status + ' — ' + inj.type);\n  });\n}\nlines.push('', \"Write a punchy, supporter-facing 2-3 sentence update for the team's website. Requirements:\", '1. Open with the result and score — mention the scorer(s) if available', '2. Include a performance detail from the stats if provided', '3. Close with the next fixture', '4. If there are injuries, weave in one concern naturally', '', 'Return ONLY plain text — no HTML, no markdown, no quotes.');\nconst prompt = lines.join('\\n');\nconst claudeBody = { model: 'claude-sonnet-4-6', max_tokens: 300, messages: [{ role: 'user', content: prompt }] };\nreturn [{ json: { ...d, prompt, claudeBody } }];"
+        "jsCode": "const d = $input.first().json;\nlet nextFixtureText = 'No upcoming match currently scheduled.';\nif (d.nextMatchDate) {\n  const dt = new Date(d.nextMatchDate);\n  const formatted = dt.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });\n  nextFixtureText = 'Next: ' + d.nextOpponent + ' (' + d.nextCompetition + ') - ' + formatted;\n}\nconst lines = [\n  'Update the website for ' + d.teamName + '.',\n  '',\n  'MATCH:',\n  '- ' + d.competition + ' | ' + (d.isHome ? 'Home' : 'Away') + ' vs ' + d.opponentName,\n  '- Result: ' + d.result + ' ' + d.goalsFor + '-' + d.goalsAgainst\n];\nif (d.goalScorers && d.goalScorers.length > 0) {\n  lines.push('- Goals: ' + d.goalScorers.join(', '));\n}\nif (d.myStats && Object.keys(d.myStats).length > 0) {\n  const s = d.myStats;\n  const parts = [];\n  if (s.shots !== undefined) parts.push('Shots ' + s.shots + (s.shots_on_target !== undefined ? ' (' + s.shots_on_target + ' on target)' : ''));\n  if (s.possession !== undefined) parts.push('Possession ' + s.possession + '%');\n  if (s.corners !== undefined) parts.push('Corners ' + s.corners);\n  if (parts.length > 0) lines.push('- Stats: ' + parts.join(' | '));\n}\nlines.push('', 'GROUP: ' + d.group, '', 'NEXT MATCH: ' + nextFixtureText);\nif (d.injuries && d.injuries.length > 0) {\n  lines.push('', 'INJURY LIST:');\n  d.injuries.forEach(inj => {\n    lines.push('- ' + inj.name + (inj.position ? ' (' + inj.position + ')' : '') + ': ' + inj.status + ' - ' + inj.type);\n  });\n}\nlines.push('', \"Write a punchy, supporter-facing 2-3 sentence update for the team's website. Requirements:\", '1. Open with the result and score - mention the scorer(s) if available', '2. Include a performance detail from the stats if provided', '3. Close with the next fixture', '4. If there are injuries, weave in one concern naturally', '', 'Return ONLY plain text - no HTML, no markdown, no quotes.');\nconst prompt = lines.join('\\n');\nconst claudeBody = { model: 'claude-sonnet-4-6', max_tokens: 300, messages: [{ role: 'user', content: prompt }] };\nreturn [{ json: { ...d, prompt, claudeBody } }];"
       },
       "id": "node-010",
       "name": "Build Claude Prompt",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2440, 80]
+      "position": [2220, 80]
     },
     {
       "parameters": {
@@ -204,17 +181,17 @@
       "name": "Claude API Call",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2660, 80]
+      "position": [2440, 80]
     },
     {
       "parameters": {
-        "jsCode": "const claudeResp = $input.first().json;\nconst promptData = $('Build Claude Prompt').first().json;\nconst generatedContent = claudeResp.content?.[0]?.text?.trim() || '';\nif (!generatedContent) {\n  throw new Error('Claude returned empty content for ' + promptData.teamName);\n}\nconst resultEmoji = promptData.result === 'WIN' ? ':white_check_mark:' : promptData.result === 'LOSS' ? ':x:' : ':heavy_minus_sign:';\nconst scoreText = promptData.goalsFor + '-' + promptData.goalsAgainst;\nconst scorerLine = promptData.goalScorers?.length > 0 ? '⚽  ' + promptData.goalScorers.join(', ') : null;\nconst injuryLine = promptData.injuries?.length > 0 ? '🩹  ' + promptData.injuries.map(i => i.name + ' (' + i.status + ')').join(', ') : null;\nconst contextParts = ['Group: ' + promptData.group];\nif (promptData.nextOpponent !== 'TBD') contextParts.push('Next: ' + promptData.nextOpponent + ' (' + promptData.nextCompetition + ')');\nif (injuryLine) contextParts.push('Injuries: ' + promptData.injuries.length);\nconst slackBody = {\n  text: promptData.teamName + ' | ' + promptData.result + ' ' + scoreText + ' vs ' + promptData.opponentName,\n  blocks: [\n    { type: 'header', text: { type: 'plain_text', text: promptData.teamName + '  |  ' + promptData.result + ' ' + scoreText, emoji: true } },\n    { type: 'section', text: { type: 'mrkdwn', text: resultEmoji + '  *vs ' + promptData.opponentName + '*  (' + promptData.competition + ')' + (scorerLine ? '\\n' + scorerLine : '') + '\\n\\n' + generatedContent } },\n    { type: 'context', elements: [{ type: 'mrkdwn', text: contextParts.join('  |  ') }] }\n  ]\n};\nreturn [{ json: { ...promptData, generatedContent, slackBody } }];"
+        "jsCode": "const claudeResp = $input.first().json;\nconst promptData = $('Build Claude Prompt').first().json;\nconst generatedContent = claudeResp.content?.[0]?.text?.trim() || '';\nif (!generatedContent) {\n  throw new Error('Claude returned empty content for ' + promptData.teamName);\n}\nconst resultEmoji = promptData.result === 'WIN' ? ':white_check_mark:' : promptData.result === 'LOSS' ? ':x:' : ':heavy_minus_sign:';\nconst scoreText = promptData.goalsFor + '-' + promptData.goalsAgainst;\nconst scorerLine = promptData.goalScorers?.length > 0 ? 'Goals: ' + promptData.goalScorers.join(', ') : null;\nconst contextParts = ['Group: ' + promptData.group];\nif (promptData.nextOpponent !== 'TBD') contextParts.push('Next: ' + promptData.nextOpponent + ' (' + promptData.nextCompetition + ')');\nif (promptData.injuries?.length > 0) contextParts.push('Injuries: ' + promptData.injuries.length);\nconst slackBody = {\n  text: promptData.teamName + ' | ' + promptData.result + ' ' + scoreText + ' vs ' + promptData.opponentName,\n  blocks: [\n    { type: 'header', text: { type: 'plain_text', text: promptData.teamName + '  |  ' + promptData.result + ' ' + scoreText, emoji: true } },\n    { type: 'section', text: { type: 'mrkdwn', text: resultEmoji + '  *vs ' + promptData.opponentName + '*  (' + promptData.competition + ')' + (scorerLine ? '\\n' + scorerLine : '') + '\\n\\n' + generatedContent } },\n    { type: 'context', elements: [{ type: 'mrkdwn', text: contextParts.join('  |  ') }] }\n  ]\n};\nreturn [{ json: { ...promptData, generatedContent, slackBody } }];"
       },
       "id": "node-012",
       "name": "Parse Claude Response",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2880, 80]
+      "position": [2660, 80]
     },
     {
       "parameters": {
@@ -229,7 +206,7 @@
       "name": "Send Slack Message",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [3100, 80]
+      "position": [2880, 80]
     },
     {
       "parameters": {
@@ -239,15 +216,15 @@
       "name": "Log Success",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [3320, 80]
+      "position": [3100, 80]
     },
     {
       "parameters": {},
       "id": "node-017",
-      "name": "No Matches - Stop",
+      "name": "Skip - No Match Today",
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
-      "position": [900, 440]
+      "position": [1340, 360]
     },
     {
       "parameters": {},
@@ -255,62 +232,48 @@
       "name": "All Teams Processed",
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
-      "position": [1120, 440]
-    },
-    {
-      "parameters": {},
-      "id": "node-019",
-      "name": "Skip - Not in Config",
-      "type": "n8n-nodes-base.noOp",
-      "typeVersion": 1,
-      "position": [1780, 340]
+      "position": [680, 500]
     },
     {
       "parameters": {
-        "content": "## SETUP — Read Before Activating\n\n### 1. Variables (hardcode in each node if plan doesn't support Variables)\n\n| Variable | Value |\n|---|---|\n| `OPTICODDS_KEY` | Your key from OpticOdds dashboard |\n| `LEAGUE_SLUG` | League ID from `GET /api/v3/leagues?sport=soccer` |\n| `CLAUDE_API_KEY` | Anthropic key from console.anthropic.com |\n| `SLACK_WEBHOOK_URL` | Incoming Webhook URL from api.slack.com/apps |\n\n### 2. Team Map\nEdit **Team Lookup** with your team display names (check Extract Teams output after a test run to get exact strings) and post IDs.\n\n### 3. Data enrichment in this version\n- **Scores**: `scores.home.total` / `scores.away.total`\n- **Goal scorers**: parsed from `events[]` — field names may vary; check Build Match Context if scorers are empty\n- **Stats**: shots, possession, corners from `stats[].stats` — adjust field names if needed (see note below)\n- **Injuries**: live injury list for each team fetched from `/injuries`\n\n### 4. Verify stat field names\nSoccer stat keys in `myStats` may differ from baseball (e.g. `shots_on_goal` vs `shots_on_target`, `ball_possession` vs `possession`). After a test run, open Build Claude Prompt and check what keys are present in `d.myStats`, then adjust the field names in the code.",
-        "height": 500,
-        "width": 640,
+        "content": "## SETUP — Read Before Activating\n\n### 1. API Keys\nIf you have n8n Variables, set:\n- `OPTICODDS_KEY` — OpticOdds dashboard\n- `CLAUDE_API_KEY` — console.anthropic.com\n- `SLACK_WEBHOOK_URL` — api.slack.com/apps\n\nIf not, replace `$vars.OPTICODDS_KEY` etc. directly in each HTTP node.\n\n### 2. Team IDs (required before first run)\n1. Call `GET https://api.opticodds.com/api/v3/teams?sport=soccer&league=<your-league>` to get real team IDs\n2. Open **Get Configured Teams** and replace each `REPLACE_WITH_REAL_ID`\n3. Update team names and group values to match your setup\n\n### 3. How it works\nFor every configured team:\n- Calls `/fixtures/results?team_id=...` — skips team if no match today\n- If a result exists: fetches next fixture + injuries, builds AI summary, posts to Slack\n\n### 4. First-run checks\n- Check `Extract Match Data` output to verify home/away detection is correct\n- Check `Build Match Context` output to confirm goal scorers and stat keys are populated",
+        "height": 420,
+        "width": 580,
         "color": 4
       },
       "id": "node-020",
       "name": "Setup Instructions",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
-      "position": [240, 520]
+      "position": [240, 540]
     }
   ],
   "connections": {
     "Poll Every 30 Minutes": {
-      "main": [[{ "node": "Fetch Finished Matches", "type": "main", "index": 0 }]]
+      "main": [[{ "node": "Get Configured Teams", "type": "main", "index": 0 }]]
     },
-    "Fetch Finished Matches": {
-      "main": [[{ "node": "Any Matches Finished?", "type": "main", "index": 0 }]]
-    },
-    "Any Matches Finished?": {
-      "main": [
-        [{ "node": "Extract Teams From Matches", "type": "main", "index": 0 }],
-        [{ "node": "No Matches - Stop",          "type": "main", "index": 0 }]
-      ]
-    },
-    "Extract Teams From Matches": {
+    "Get Configured Teams": {
       "main": [[{ "node": "Loop: Split Teams", "type": "main", "index": 0 }]]
     },
     "Loop: Split Teams": {
       "main": [
-        [{ "node": "Team Lookup",         "type": "main", "index": 0 }],
+        [{ "node": "Fetch Team Results",  "type": "main", "index": 0 }],
         [{ "node": "All Teams Processed", "type": "main", "index": 0 }]
       ]
     },
-    "Team Lookup": {
-      "main": [[{ "node": "Team in Config?", "type": "main", "index": 0 }]]
+    "Fetch Team Results": {
+      "main": [[{ "node": "Any Match Today?", "type": "main", "index": 0 }]]
     },
-    "Team in Config?": {
+    "Any Match Today?": {
       "main": [
-        [{ "node": "Fetch Next Match",     "type": "main", "index": 0 }],
-        [{ "node": "Skip - Not in Config", "type": "main", "index": 0 }]
+        [{ "node": "Extract Match Data",    "type": "main", "index": 0 }],
+        [{ "node": "Skip - No Match Today", "type": "main", "index": 0 }]
       ]
     },
-    "Skip - Not in Config": {
+    "Extract Match Data": {
+      "main": [[{ "node": "Fetch Next Match", "type": "main", "index": 0 }]]
+    },
+    "Skip - No Match Today": {
       "main": [[{ "node": "Loop: Split Teams", "type": "main", "index": 0 }]]
     },
     "Fetch Next Match": {
@@ -347,5 +310,5 @@
     { "name": "auto-update" }
   ],
   "triggerCount": 0,
-  "versionId": "5"
+  "versionId": "6"
 }
