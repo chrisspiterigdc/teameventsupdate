@@ -50,7 +50,7 @@ def canonical(name: str) -> str:
 def fetch_todays_matches(today: str) -> list:
     """Return finished Premier League matches for today from football-data.org or mock data."""
     if not FOOTBALL_DATA_API_KEY:
-        print("FOOTBALL_DATA_API_KEY not set — using mock match data.\n")
+        print("FOOTBALL_DATA_API_KEY not set - using mock match data.\n")
         return _mock_matches(today)
 
     url = (
@@ -62,7 +62,7 @@ def fetch_todays_matches(today: str) -> list:
         resp.raise_for_status()
         return resp.json().get("matches", [])
     except requests.RequestException as exc:
-        print(f"Football API error ({exc}) — falling back to mock data.\n")
+        print(f"Football API error ({exc}) - falling back to mock data.\n")
         return _mock_matches(today)
 
 
@@ -79,7 +79,7 @@ def _mock_matches(today: str) -> list:
                 "context": {
                     "Brighton & Hove Albion": (
                         "Result lifted Brighton above Chelsea into 6th place on 50 points "
-                        "with four games remaining. Now firmly in the European conversation — "
+                        "with four games remaining. Now firmly in the European conversation: "
                         "a Europa League spot is realistic, and a Champions League place is "
                         "still mathematically possible if Aston Villa win the Europa League "
                         "while finishing in the top five. Goals from Ferdi Kadioglu, Jack "
@@ -89,8 +89,8 @@ def _mock_matches(today: str) -> list:
                         "Defeat leaves Chelsea 7th on 48 points and could drop them as far "
                         "as 11th once matchweek 34 concludes. Champions League qualification "
                         "hopes have significantly diminished. It is a fifth straight Premier "
-                        "League game without scoring — Chelsea's worst scoreless top-flight "
-                        "run since 1912 — and the pressure on head coach Liam Rosenior is mounting."
+                        "League game without scoring, Chelsea's worst scoreless top-flight "
+                        "run since 1912, and the pressure on head coach Liam Rosenior is mounting."
                     ),
                 },
             },
@@ -98,7 +98,7 @@ def _mock_matches(today: str) -> list:
     }
     matches = known.get(today, [])
     if not matches:
-        print(f"No known mock data for {today} — no matches returned.\n")
+        print(f"No known mock data for {today} - no matches returned.\n")
     return matches
 
 
@@ -147,8 +147,9 @@ def generate_team_news(team: str, match: dict, client: anthropic.Anthropic) -> s
         f"Context: {team_context}\n\n"
         "Style rules: short punchy sentences, narrative-led not stat-led, present tense, "
         "optimistic or honest depending on result, 3-4 short paragraphs of 1-2 sentences each. "
-        "Weave in the table/European angle naturally — don't list raw points totals. "
-        "Use the team's common short name. No headers, bullets, emoji, or first-person language."
+        "Weave in the table/European angle naturally, don't list raw points totals. "
+        "Use the team's common short name. No headers, bullets, emoji, or first-person language. "
+        "Do not use em dashes (—) anywhere. Use commas, colons, full stops, or hyphens instead."
     )
     msg = client.messages.create(
         model="claude-opus-4-7",
@@ -175,7 +176,7 @@ def main() -> None:
         target_date = sys.argv[1]
     else:
         target_date = date.today().strftime("%Y-%m-%d")
-    print(f"Premier League results check — {target_date}")
+    print(f"Premier League results check - {target_date}")
     print(f"Tracking {len(PREMIER_LEAGUE_TEAMS)} clubs\n")
 
     if not ANTHROPIC_API_KEY and not ANTHROPIC_AUTH_TOKEN:
@@ -189,7 +190,7 @@ def main() -> None:
     slack = WebClient(token=SLACK_BOT_TOKEN) if SLACK_BOT_TOKEN else None
 
     if slack is None:
-        print("SLACK_BOT_TOKEN not set — printing to stdout instead.\n")
+        print("SLACK_BOT_TOKEN not set - printing to stdout instead.\n")
 
     matches = fetch_todays_matches(target_date)
 
@@ -201,7 +202,7 @@ def main() -> None:
 
     print(f"Found {len(matches)} completed fixture(s).\n")
 
-    post(f":soccer: *Premier League Results — {target_date}*", slack)
+    post(f":soccer: *Premier League Results - {target_date}*", slack)
 
     count = 0
     for match in matches:
@@ -224,7 +225,7 @@ def main() -> None:
         f"{count} summaries generated_",
         slack,
     )
-    print(f"\nDone — {count} summaries generated.")
+    print(f"\nDone - {count} summaries generated.")
 
 
 if __name__ == "__main__":
