@@ -1,21 +1,20 @@
 """
 check_results.py
 
-Reads completed Premier League fixture JSON from stdin, generates a short
-Claude summary for each match, and prints a formatted Slack message to stdout.
+Reads completed Premier League fixture JSON from stdin (Opticodds v3 format),
+generates a ~200-word editorial "current situation" blurb for each team via
+Claude, and prints one JSON object per line to stdout for the Slack connector
+to post.
 
 Usage:
     echo '<fixtures_json>' | python check_results.py
 
-The input JSON should be either:
-  - An array of fixture objects, or
-  - An object with a "data" key containing the array (Opticodds envelope).
-
-Fixture objects are expected in the Opticodds v3 format:
-  home_team_display, away_team_display, result.scores.home.total, result.scores.away.total
+Input: Opticodds envelope {"data": [...]} or bare array of fixture objects.
+Output: newline-delimited JSON, one object per team message:
+    {"team": "Arsenal FC", "message": "..."}
 
 Required environment variables:
-  ANTHROPIC_API_KEY  (or ANTHROPIC_BASE_URL if already configured)
+    ANTHROPIC_API_KEY  (or ANTHROPIC_BASE_URL if already configured)
 """
 
 import json
@@ -34,33 +33,41 @@ def load_fixtures(raw: str) -> list[dict]:
     return []
 
 
-def result_emoji(home: int, away: int) -> str:
-    if home > away:
-        return ":blue_circle:"
-    if home < away:
-        return ":red_circle:"
-    return ":white_circle:"
+def result_label(team_score: int, opp_score: int) -> str:
+    if team_score > opp_score:
+        return "WIN"
+    if team_score < opp_score:
+        return "LOSS"
+    return "DRAW"
 
 
-def generate_summary(claude: anthropic.Anthropic, home: str, away: str, hs: int, as_: int) -> str:
-    if hs > as_:
-        outcome = f"{home} won"
-    elif hs < as_:
-        outcome = f"{away} won"
-    else:
-        outcome = "The match ended in a draw"
+def build_prompt(team: str, opponent: str, team_score: int, opp_score: int,
+                 venue: str, match_date: str) -> str:
+    result = result_label(team_score, opp_score)
+    home_away = "at home" if venue else ""
+    return f"""Write a short editorial piece (~200 words, 4 paragraphs) for {team}'s section on a sports betting website.
 
+Match just played ({match_date}): {team} {team_score}–{opp_score} {opponent} {home_away} — {result}
+
+The piece should cover:
+1. The result and what it means for the team right now
+2. Their broader season situation (form, league position, any cup runs)
+3. Historical or contextual detail that's relevant
+4. A forward-looking line about what comes next
+
+Tone: authoritative football journalist, engaging but factual.
+Format: Start with the heading "Latest {team} News" on its own line, then a punchy one-line sub-headline (question or statement), then 3–4 short paragraphs.
+Constraint: Only include facts you are genuinely confident are accurate. Do not fabricate statistics, scorelines, or events."""
+
+
+def generate_blurb(claude: anthropic.Anthropic, team: str, opponent: str,
+                   team_score: int, opp_score: int, venue: str, match_date: str) -> str:
     msg = claude.messages.create(
         model="claude-sonnet-4-6",
-        max_tokens=300,
+        max_tokens=600,
         messages=[{
             "role": "user",
-            "content": (
-                f"Write a punchy 2-3 sentence Premier League match summary:\n\n"
-                f"  {home} {hs} – {as_} {away}\n"
-                f"  Outcome: {outcome}\n\n"
-                f"Be enthusiastic and concise. Mention both teams and the scoreline."
-            ),
+            "content": build_prompt(team, opponent, team_score, opp_score, venue, match_date),
         }],
     )
     return msg.content[0].text.strip()
@@ -73,28 +80,32 @@ def main() -> None:
         sys.exit(1)
 
     fixtures = load_fixtures(raw)
-    today = date.today().isoformat()
+    if not fixtures:
+        print("No fixtures found in input.", file=sys.stderr)
+        sys.exit(0)
+
     claude = anthropic.Anthropic()
 
-    if not fixtures:
-        print(f":soccer: *Premier League Results — {today}*\n\nNo completed matches found.")
-        return
-
-    print(f"Generating summaries for {len(fixtures)} match(es)...", file=sys.stderr, flush=True)
-
-    lines = [f":soccer: *Premier League Results — {today}*\n"]
     for match in fixtures:
-        home = match.get("home_team_display", "Home")
-        away = match.get("away_team_display", "Away")
+        home = match.get("home_team_display", "")
+        away = match.get("away_team_display", "")
         scores = match.get("result", {}).get("scores", {})
         hs = scores.get("home", {}).get("total", 0)
         as_ = scores.get("away", {}).get("total", 0)
+        venue = match.get("venue_name", "")
+        match_date = (match.get("start_date") or "")[:10]
 
-        print(f"  {home} {hs}–{as_} {away}", file=sys.stderr, flush=True)
-        summary = generate_summary(claude, home, away, hs, as_)
-        lines.append(f"{result_emoji(hs, as_)} *{home} {hs}–{as_} {away}*\n{summary}")
-
-    print("\n\n".join(lines))
+        for team, opponent, ts, os_, at_home in [
+            (home, away, hs, as_, True),
+            (away, home, as_, hs, False),
+        ]:
+            print(f"Generating: {team}", file=sys.stderr, flush=True)
+            blurb = generate_blurb(
+                claude, team, opponent, ts, os_,
+                venue if at_home else "",
+                match_date,
+            )
+            print(json.dumps({"team": team, "message": blurb}))
 
 
 if __name__ == "__main__":
