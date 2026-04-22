@@ -63,13 +63,12 @@
     {
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
           "conditions": [
             {
               "id": "cond-matches",
               "leftValue": "={{ $json.hasMatch }}",
-              "rightValue": true,
-              "operator": { "type": "boolean", "operation": "equal" }
+              "operator": { "type": "boolean", "operation": "true" }
             }
           ],
           "combinator": "and"
@@ -303,5 +302,5 @@
   "staticData": null,
   "tags": [{ "name": "football" }, { "name": "premier-league" }, { "name": "slack" }, { "name": "auto-update" }],
   "triggerCount": 0,
-  "versionId": "11"
+  "versionId": "12"
 }
