@@ -239,24 +239,18 @@ def build_slack_message(
     return "\n".join(lines)
 
 
-def post_to_slack(message: str) -> bool:
-    """Attempt to post to Slack via webhook or bot token. Returns True on success."""
-    webhook = os.environ.get("SLACK_WEBHOOK_URL")
-    if webhook:
-        try:
-            r = requests.post(webhook, json={"text": message}, timeout=10)
-            return r.status_code == 200
-        except Exception:
-            pass
+SLACK_CHANNEL_ID = "C0AVBC6256C"
 
+
+def post_to_slack(message: str) -> bool:
+    """Post to Slack channel C0AVBC6256C via bot token. Returns True on success."""
     token = os.environ.get("SLACK_BOT_TOKEN")
-    channel = os.environ.get("SLACK_CHANNEL", "#optic-general")
     if token:
         try:
             r = requests.post(
                 "https://slack.com/api/chat.postMessage",
                 headers={"Authorization": f"Bearer {token}"},
-                json={"channel": channel, "text": message},
+                json={"channel": SLACK_CHANNEL_ID, "text": message},
                 timeout=10,
             )
             return r.json().get("ok", False)
