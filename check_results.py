@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """
 Premier League match results checker.
-Fetches today's completed matches, generates supporter summaries via Claude,
-and posts them to Slack (or stdout when no SLACK_BOT_TOKEN is set).
+Fetches yesterday's completed matches by default, generates 'Latest [Team] News'
+blurbs via Claude, and posts them to Slack (or stdout when no SLACK_BOT_TOKEN is set).
+
+Pass an explicit YYYY-MM-DD to override the default.
 """
 
 import os
 import sys
-from datetime import date
+from datetime import date, timedelta
 
 import requests
 import anthropic
@@ -175,7 +177,9 @@ def main() -> None:
     if len(sys.argv) > 1:
         target_date = sys.argv[1]
     else:
-        target_date = date.today().strftime("%Y-%m-%d")
+        # Default: yesterday. Matches finish late, so today's fixtures rarely have
+        # complete results by the time this runs.
+        target_date = (date.today() - timedelta(days=1)).strftime("%Y-%m-%d")
     print(f"Premier League results check - {target_date}")
     print(f"Tracking {len(PREMIER_LEAGUE_TEAMS)} clubs\n")
 

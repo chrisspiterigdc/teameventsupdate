@@ -1,6 +1,8 @@
 # teameventsupdate
 
-Checks today's completed Premier League matches, generates a short editorial "Latest [Team] News" blurb per involved club using Claude, and posts the results to Slack.
+Checks **yesterday's** completed Premier League matches, generates a short editorial "Latest [Team] News" blurb per involved club using Claude, and posts the results to Slack.
+
+Yesterday is always the default target date. Matches typically finish late in the day, so by the time this runs (next morning), yesterday's fixtures have final scores and settled league-table implications. A specific date can be passed as an argument to override.
 
 ## Quick start
 
@@ -17,8 +19,8 @@ export SLACK_BOT_TOKEN=xoxb-...                # omit to print to stdout
 export SLACK_CHANNEL=C0AVBC6256C               # channel ID (default: #match-results)
 export FOOTBALL_DATA_API_KEY=...               # omit to use built-in mock data
 
-python check_results.py                        # today
-python check_results.py 2026-04-21             # specific date
+python check_results.py                        # yesterday (default)
+python check_results.py 2026-04-21             # specific date override
 ```
 
 ## What it does
