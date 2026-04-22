@@ -1,10 +1,10 @@
 {
   "_notes": {
-    "league": "Confirm slug via GET https://api.opticodds.com/api/v3/leagues?sport=soccer",
-    "teamIds": "Get IDs via GET https://api.opticodds.com/api/v3/teams?sport=soccer&league=english-premier-league",
-    "teamNames": "Names in Get Configured Teams node must match exactly what OpticOdds returns in home_team_display / away_team_display"
+    "league": "Confirmed slug from GET /api/v3/leagues?sport=soccer",
+    "teamIds": "Get IDs via: curl -H 'X-Api-Key: <key>' 'https://api.opticodds.com/api/v3/teams?sport=soccer&league=england_-_premier_league'",
+    "teamNames": "Names in Get Configured Teams node must match exactly what OpticOdds returns"
   },
-  "leagueSlug": "english-premier-league",
+  "leagueSlug": "england_-_premier_league",
   "season": "2025-26",
   "teams": [
     { "teamName": "Arsenal",                 "postId": 101, "opticoddsId": "REPLACE_WITH_REAL_ID" },
