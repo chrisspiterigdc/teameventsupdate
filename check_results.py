@@ -7,9 +7,16 @@ import sys
 
 import requests
 
-OPTICODDS_KEY     = os.environ.get("OPTICODDS_KEY", "")
-CLAUDE_API_KEY    = os.environ.get("CLAUDE_API_KEY", "")
-SLACK_WEBHOOK_URL = os.environ.get("SLACK_WEBHOOK_URL", "")
+# Read from environment variables if set, otherwise fall back to config.py
+try:
+    import config as _cfg
+    OPTICODDS_KEY     = os.environ.get("OPTICODDS_KEY")     or _cfg.OPTICODDS_KEY
+    CLAUDE_API_KEY    = os.environ.get("CLAUDE_API_KEY")    or _cfg.CLAUDE_API_KEY
+    SLACK_WEBHOOK_URL = os.environ.get("SLACK_WEBHOOK_URL") or _cfg.SLACK_WEBHOOK_URL
+except ImportError:
+    OPTICODDS_KEY     = os.environ.get("OPTICODDS_KEY", "")
+    CLAUDE_API_KEY    = os.environ.get("CLAUDE_API_KEY", "")
+    SLACK_WEBHOOK_URL = os.environ.get("SLACK_WEBHOOK_URL", "")
 
 TEAMS = [
     {"teamName": "AFC Bournemouth",         "opticoddsId": "F2CCF38E0A5A"},
@@ -79,8 +86,8 @@ def get_injuries(team_id):
         return []
 
 
-def _first(lst, default=None):
-    return (lst or [{}])[0] if lst else (default or {})
+def _first(lst):
+    return (lst or [{}])[0]
 
 
 def extract_match_info(fixture, team_id):
@@ -218,12 +225,12 @@ def call_claude(prompt):
 
 
 def send_slack(team_name, d, generated):
-    result  = d["result"]
-    score   = f"{d['goals_for']}-{d['goals_against']}"
-    opponent = d["opponent"]
+    result      = d["result"]
+    score       = f"{d['goals_for']}-{d['goals_against']}"
+    opponent    = d["opponent"]
     competition = d.get("competition") or "Premier League"
     next_fixture = d.get("next_fixture")
-    injuries = d.get("injuries", [])
+    injuries    = d.get("injuries", [])
 
     emoji = {"WIN": ":white_check_mark:", "LOSS": ":x:", "DRAW": ":heavy_minus_sign:"}.get(result, ":heavy_minus_sign:")
     ctx = [competition]
@@ -269,13 +276,14 @@ def process_team(team, today, tomorrow):
 
 
 def main():
+    placeholder = "PASTE_YOUR"
     missing = [k for k, v in [
         ("OPTICODDS_KEY",     OPTICODDS_KEY),
         ("CLAUDE_API_KEY",    CLAUDE_API_KEY),
         ("SLACK_WEBHOOK_URL", SLACK_WEBHOOK_URL),
-    ] if not v]
+    ] if not v or placeholder in v]
     if missing:
-        print(f"ERROR: missing env vars: {', '.join(missing)}")
+        print(f"ERROR: fill in these keys in config.py: {', '.join(missing)}")
         sys.exit(1)
 
     today    = datetime.date.today().isoformat()
@@ -283,7 +291,7 @@ def main():
     print(f"Checking {len(TEAMS)} Premier League teams for {today} ...")
 
     sent = sum(1 for team in TEAMS if process_team(team, today, tomorrow))
-    print(f"\nDone — {sent} Slack message(s) sent.")
+    print(f"\nDone - {sent} Slack message(s) sent.")
 
 
 if __name__ == "__main__":
