@@ -76,6 +76,23 @@ def _mock_matches(today: str) -> list:
                 "score": {"fullTime": {"home": 3, "away": 0}, "halfTime": {"home": 1, "away": 0}},
                 "status": "FINISHED",
                 "utcDate": f"{today}T15:00:00Z",
+                "context": {
+                    "Brighton & Hove Albion": (
+                        "Result lifted Brighton above Chelsea into 6th place on 50 points "
+                        "with four games remaining. Now firmly in the European conversation — "
+                        "a Europa League spot is realistic, and a Champions League place is "
+                        "still mathematically possible if Aston Villa win the Europa League "
+                        "while finishing in the top five. Goals from Ferdi Kadioglu, Jack "
+                        "Hinshelwood and substitute Danny Welbeck."
+                    ),
+                    "Chelsea": (
+                        "Defeat leaves Chelsea 7th on 48 points and could drop them as far "
+                        "as 11th once matchweek 34 concludes. Champions League qualification "
+                        "hopes have significantly diminished. It is a fifth straight Premier "
+                        "League game without scoring — Chelsea's worst scoreless top-flight "
+                        "run since 1912 — and the pressure on head coach Liam Rosenior is mounting."
+                    ),
+                },
             },
         ],
     }
@@ -106,13 +123,21 @@ def generate_team_news(team: str, match: dict, client: anthropic.Anthropic) -> s
     else:
         result = "defeat"
 
+    team_context = (match.get("context") or {}).get(team, "")
+    context_block = (
+        f"\nLeague context for {team}:\n{team_context}\n"
+        if team_context else ""
+    )
+
     prompt = (
         f"Write a short 'Latest {team} News' blurb for a football betting information website. "
         f"Base it on this result: {team} {('won' if result == 'win' else 'drew' if result == 'draw' else 'lost')} "
         f"{team_goals}-{opp_goals} {venue} to {opponent} (HT: {ht_h if is_home else ht_a}-{ht_a if is_home else ht_h}). "
+        f"{context_block}"
         "Write 2-3 short paragraphs in a neutral, journalistic third-person tone — like an editor summarising "
-        "the team's recent situation for someone visiting their team page. Cover the result and what it means "
-        "for the team's form or league position, and end with a brief forward-looking note. "
+        "the team's recent situation for someone visiting their team page. Cover the result, then the league-table "
+        "implications (use the league context above — name the current position, points, and any European "
+        "qualification angle), and end with a forward-looking note about the run-in. "
         "Do not use headers, bullet points, emoji, or first-person language. Plain prose only."
     )
     msg = client.messages.create(
