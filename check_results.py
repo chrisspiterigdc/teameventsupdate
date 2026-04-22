@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Premier League yesterday's results -> Claude summary -> prints JSON for Claude to post to Slack."""
+"""Fetch yesterday's Premier League match data from OpticOdds and print as JSON."""
 
 import datetime
 import json
@@ -10,11 +10,9 @@ import requests
 
 try:
     import config as _cfg
-    OPTICODDS_KEY  = os.environ.get("OPTICODDS_KEY")  or _cfg.OPTICODDS_KEY
-    CLAUDE_API_KEY = os.environ.get("CLAUDE_API_KEY") or _cfg.CLAUDE_API_KEY
+    OPTICODDS_KEY = os.environ.get("OPTICODDS_KEY") or _cfg.OPTICODDS_KEY
 except ImportError:
-    OPTICODDS_KEY  = os.environ.get("OPTICODDS_KEY", "")
-    CLAUDE_API_KEY = os.environ.get("CLAUDE_API_KEY", "")
+    OPTICODDS_KEY = os.environ.get("OPTICODDS_KEY", "")
 
 TEAMS = [
     {"teamName": "AFC Bournemouth",         "opticoddsId": "F2CCF38E0A5A"},
@@ -44,235 +42,136 @@ TEAMS = [
     {"teamName": "Wolverhampton Wanderers",  "opticoddsId": "1F74DDDE7110"},
 ]
 
-OPTICODDS_BASE = "https://api.opticodds.com/api/v3"
+BASE = "https://api.opticodds.com/api/v3"
 
 
-def opticodds_get(path, params):
-    r = requests.get(
-        f"{OPTICODDS_BASE}{path}",
-        headers={"X-Api-Key": OPTICODDS_KEY},
-        params=params,
-        timeout=15,
-    )
+def api_get(path, params):
+    r = requests.get(f"{BASE}{path}", headers={"X-Api-Key": OPTICODDS_KEY}, params=params, timeout=15)
     r.raise_for_status()
     return r.json().get("data", [])
-
-
-def get_fixture_for_date(team_id, date):
-    fixtures = opticodds_get("/fixtures/results", {"sport": "soccer", "team_id": team_id})
-    matches = [
-        f for f in fixtures
-        if (f.get("fixture", {}).get("start_date") or f.get("start_date", "")).startswith(date)
-    ]
-    return matches[0] if matches else None
-
-
-def get_next_fixture(team_id, from_date):
-    fixtures = opticodds_get("/fixtures", {
-        "sport": "soccer",
-        "team_id": team_id,
-        "start_date": from_date,
-        "limit": 1,
-    })
-    return fixtures[0] if fixtures else None
-
-
-def get_injuries(team_id):
-    try:
-        return opticodds_get("/injuries", {"sport": "soccer", "team_id": team_id})
-    except Exception:
-        return []
 
 
 def _first(lst):
     return (lst or [{}])[0]
 
 
-def extract_match_info(fixture, team_id):
+def get_fixture(team_id, date):
+    all_fixtures = api_get("/fixtures/results", {"sport": "soccer", "team_id": team_id})
+    matches = [f for f in all_fixtures
+               if (f.get("fixture", {}).get("start_date") or "").startswith(date)]
+    return matches[0] if matches else None
+
+
+def get_next(team_id, from_date):
+    fixtures = api_get("/fixtures", {"sport": "soccer", "team_id": team_id, "start_date": from_date, "limit": 1})
+    return fixtures[0] if fixtures else None
+
+
+def get_injuries(team_id):
+    try:
+        return api_get("/injuries", {"sport": "soccer", "team_id": team_id})
+    except Exception:
+        return []
+
+
+def process_team(team, yesterday, today):
+    team_id = team["opticoddsId"]
+    fixture = get_fixture(team_id, yesterday)
+    if not fixture:
+        return None
+
     f = fixture.get("fixture", {})
     home_id = _first(f.get("home_competitors")).get("id")
     is_home = home_id == team_id
 
     scores = fixture.get("scores") or {}
-    home_score = (scores.get("home") or {}).get("total", 0) or 0
-    away_score = (scores.get("away") or {}).get("total", 0) or 0
-    goals_for     = home_score if is_home else away_score
-    goals_against = away_score if is_home else home_score
+    home_goals = (scores.get("home") or {}).get("total", 0) or 0
+    away_goals = (scores.get("away") or {}).get("total", 0) or 0
+    goals_for     = home_goals if is_home else away_goals
+    goals_against = away_goals if is_home else home_goals
     result = "WIN" if goals_for > goals_against else "LOSS" if goals_for < goals_against else "DRAW"
 
-    if is_home:
-        opponent = f.get("away_team_display") or _first(f.get("away_competitors")).get("name", "Unknown")
-    else:
-        opponent = f.get("home_team_display") or _first(f.get("home_competitors")).get("name", "Unknown")
-
-    competition = (fixture.get("league") or {}).get("name", "")
-    side_stats  = ((fixture.get("stats") or {}).get("home" if is_home else "away")) or []
-    my_stats    = next((s.get("stats", {}) for s in side_stats if s.get("period") == "all"), {})
-
-    return {
-        "is_home": is_home,
-        "goals_for": goals_for,
-        "goals_against": goals_against,
-        "result": result,
-        "opponent": opponent,
-        "competition": competition,
-        "stats": my_stats,
-    }
-
-
-def extract_next_fixture(raw, team_id):
-    if not raw:
-        return None
-    nf = raw.get("fixture", {})
-    nf_home_id = _first(nf.get("home_competitors")).get("id")
-    nf_is_home = nf_home_id == team_id
     opponent = (
-        nf.get("away_team_display") or _first(nf.get("away_competitors")).get("name", "TBD")
-        if nf_is_home else
-        nf.get("home_team_display") or _first(nf.get("home_competitors")).get("name", "TBD")
+        f.get("away_team_display") or _first(f.get("away_competitors")).get("name", "Unknown")
+        if is_home else
+        f.get("home_team_display") or _first(f.get("home_competitors")).get("name", "Unknown")
     )
-    return {
-        "opponent": opponent,
-        "date": nf.get("start_date"),
-        "competition": (raw.get("league") or {}).get("name", "TBD"),
-    }
+    competition = (fixture.get("league") or {}).get("name", "")
 
+    side = "home" if is_home else "away"
+    side_stats = ((fixture.get("stats") or {}).get(side)) or []
+    stats = next((s.get("stats", {}) for s in side_stats if s.get("period") == "all"), {})
 
-def extract_injuries(raw):
-    return [
+    # Next fixture
+    next_raw = get_next(team_id, today)
+    next_match = None
+    if next_raw:
+        nf = next_raw.get("fixture", {})
+        nf_is_home = _first(nf.get("home_competitors")).get("id") == team_id
+        next_match = {
+            "opponent": (
+                nf.get("away_team_display") or _first(nf.get("away_competitors")).get("name", "TBD")
+                if nf_is_home else
+                nf.get("home_team_display") or _first(nf.get("home_competitors")).get("name", "TBD")
+            ),
+            "date": nf.get("start_date"),
+            "venue": "Home" if nf_is_home else "Away",
+            "competition": (next_raw.get("league") or {}).get("name", "TBD"),
+        }
+
+    # Injuries
+    inj_raw = get_injuries(team_id)
+    injuries = [
         {
             "name": i["player"]["name"],
             "position": (i.get("player") or {}).get("position", ""),
             "status": i.get("status", ""),
             "type": i.get("type", ""),
         }
-        for i in raw
-        if (i.get("player") or {}).get("name")
+        for i in inj_raw if (i.get("player") or {}).get("name")
     ][:5]
 
+    # Key stats
+    shots   = stats.get("total_scoring_att")     if stats.get("total_scoring_att")     is not None else stats.get("shots")
+    on_tgt  = stats.get("ontarget_scoring_att")  if stats.get("ontarget_scoring_att")  is not None else stats.get("shots_on_target")
+    poss    = stats.get("possession_percentage") if stats.get("possession_percentage") is not None else stats.get("possession")
+    corners = stats.get("corner_taken")          if stats.get("corner_taken")          is not None else stats.get("corners")
 
-def build_prompt(team_name, d):
-    lines = [
-        f"Update the website for {team_name}.",
-        "",
-        "MATCH:",
-        f"- {d['competition']} | {'Home' if d['is_home'] else 'Away'} vs {d['opponent']}",
-        f"- Result: {d['result']} {d['goals_for']}-{d['goals_against']}",
-    ]
-    s = d.get("stats", {})
-    parts = []
-    shots   = s.get("total_scoring_att")     if s.get("total_scoring_att")     is not None else s.get("shots")
-    on_tgt  = s.get("ontarget_scoring_att")  if s.get("ontarget_scoring_att")  is not None else s.get("shots_on_target")
-    poss    = s.get("possession_percentage") if s.get("possession_percentage") is not None else s.get("possession")
-    corners = s.get("corner_taken")          if s.get("corner_taken")          is not None else s.get("corners")
-    if shots   is not None: parts.append(f"Shots {shots}" + (f" ({on_tgt} on target)" if on_tgt is not None else ""))
-    if poss    is not None: parts.append(f"Possession {poss}%")
-    if corners is not None: parts.append(f"Corners {corners}")
-    if parts:
-        lines.append("- Stats: " + " | ".join(parts))
-
-    nf = d.get("next_fixture")
-    if nf and nf.get("date"):
-        try:
-            dt = datetime.datetime.fromisoformat(nf["date"].replace("Z", "+00:00"))
-            formatted = dt.strftime("%A %-d %B")
-        except Exception:
-            formatted = nf["date"]
-        lines += ["", f"NEXT MATCH: {nf['opponent']} ({nf['competition']}) - {formatted}"]
-    else:
-        lines += ["", "NEXT MATCH: No upcoming match currently scheduled."]
-
-    injuries = d.get("injuries", [])
-    if injuries:
-        lines += ["", "INJURY LIST:"]
-        for inj in injuries:
-            pos = f" ({inj['position']})" if inj.get("position") else ""
-            lines.append(f"- {inj['name']}{pos}: {inj.get('status', '')} - {inj.get('type', '')}")
-
-    lines += [
-        "",
-        "Write a punchy, supporter-facing 2-3 sentence update for the team's website. Requirements:",
-        "1. Open with the result and score",
-        "2. Include a performance detail from the stats if provided",
-        "3. Close with the next fixture",
-        "4. If there are injuries, weave in one concern naturally",
-        "",
-        "Return ONLY plain text - no HTML, no markdown, no quotes.",
-    ]
-    return "\n".join(lines)
-
-
-def call_claude(prompt):
-    r = requests.post(
-        "https://api.anthropic.com/v1/messages",
-        headers={
-            "x-api-key": CLAUDE_API_KEY,
-            "anthropic-version": "2023-06-01",
-            "content-type": "application/json",
-        },
-        json={
-            "model": "claude-sonnet-4-6",
-            "max_tokens": 300,
-            "messages": [{"role": "user", "content": prompt}],
-        },
-        timeout=30,
-    )
-    r.raise_for_status()
-    return r.json()["content"][0]["text"].strip()
-
-
-def process_team(team, yesterday, today):
-    team_id   = team["opticoddsId"]
-    team_name = team["teamName"]
-
-    fixture = get_fixture_for_date(team_id, yesterday)
-    if not fixture:
-        return None
-
-    d = extract_match_info(fixture, team_id)
-    d["next_fixture"] = extract_next_fixture(get_next_fixture(team_id, today), team_id)
-    d["injuries"]     = extract_injuries(get_injuries(team_id))
-
-    summary = call_claude(build_prompt(team_name, d))
-
-    nf = d.get("next_fixture")
     return {
-        "team":             team_name,
-        "result":           d["result"],
-        "score":            f"{d['goals_for']}-{d['goals_against']}",
-        "opponent":         d["opponent"],
-        "competition":      d.get("competition") or "Premier League",
-        "is_home":          d["is_home"],
-        "next_opponent":    nf["opponent"]    if nf else None,
-        "next_competition": nf["competition"] if nf else None,
-        "next_date":        nf["date"]        if nf else None,
-        "injuries":         len(d.get("injuries", [])),
-        "summary":          summary,
+        "team":        team["teamName"],
+        "result":      result,
+        "score":       f"{goals_for}-{goals_against}",
+        "opponent":    opponent,
+        "venue":       "Home" if is_home else "Away",
+        "competition": competition,
+        "match_date":  yesterday,
+        "stats": {
+            "shots":      shots,
+            "on_target":  on_tgt,
+            "possession": poss,
+            "corners":    corners,
+        },
+        "next_match":  next_match,
+        "injuries":    injuries,
     }
 
 
 def main():
-    placeholder = "PASTE_YOUR"
-    missing = [k for k, v in [
-        ("OPTICODDS_KEY",  OPTICODDS_KEY),
-        ("CLAUDE_API_KEY", CLAUDE_API_KEY),
-    ] if not v or placeholder in v]
-    if missing:
-        print(json.dumps({"error": f"Fill in these keys in config.py: {', '.join(missing)}"}))
+    if not OPTICODDS_KEY or "PASTE_YOUR" in OPTICODDS_KEY:
+        print(json.dumps({"error": "Fill in OPTICODDS_KEY in config.py"}))
         sys.exit(1)
 
     yesterday = (datetime.date.today() - datetime.timedelta(days=1)).isoformat()
     today     = datetime.date.today().isoformat()
-
-    print(f"Checking {len(TEAMS)} teams for matches on {yesterday} ...", file=sys.stderr)
+    print(f"Fetching results for {yesterday} ...", file=sys.stderr)
 
     results = []
     for team in TEAMS:
         try:
-            r = process_team(team, yesterday, today)
-            if r:
-                results.append(r)
-                print(f"  OK  {r['team']}: {r['result']} {r['score']} vs {r['opponent']}", file=sys.stderr)
+            data = process_team(team, yesterday, today)
+            if data:
+                results.append(data)
+                print(f"  OK  {data['team']}: {data['result']} {data['score']} vs {data['opponent']}", file=sys.stderr)
             else:
                 print(f"  --  {team['teamName']}: no match", file=sys.stderr)
         except Exception as e:
