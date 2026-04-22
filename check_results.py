@@ -10,6 +10,7 @@ import os
 import re
 import sys
 import requests
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date, datetime, timezone
 from anthropic import Anthropic
 
@@ -124,6 +125,8 @@ def fetch_from_bbc(target_date: str) -> list[dict]:
     """
     Scrape BBC Sport scores-fixtures page for EPL matches.
     URL: https://www.bbc.com/sport/football/premier-league/scores-fixtures/{date}
+    Returns fixtures with an extra 'bbc_context' field containing any rich text
+    found alongside each match (scorers, venue, attendance, match blurb).
     Requires beautifulsoup4. Works in production; blocked in Claude Code sandbox.
     """
     if not BS4_AVAILABLE:
@@ -136,7 +139,6 @@ def fetch_from_bbc(target_date: str) -> list[dict]:
     soup = BeautifulSoup(resp.text, "lxml")
     fixtures = []
 
-    # BBC wraps each match in an <article> or <li> with data-test="fixture"
     for item in soup.select("[data-fixture-id], [data-test='fixture-row']"):
         try:
             teams = item.select(".sp-c-fixture__team-name-trunc, .gs-u-display-none")
@@ -156,6 +158,18 @@ def fetch_from_bbc(target_date: str) -> list[dict]:
             is_completed = "FT" in status_text or "AET" in status_text
             status = "completed" if is_completed else "unplayed"
 
+            # Collect any additional context: scorers, venue, attendance, blurbs
+            context_parts = []
+            for el in item.select(
+                ".sp-c-fixture__scorers, [class*='scorer'], [class*='goal'],"
+                "[class*='venue'], [class*='attendance'], [class*='summary'],"
+                "[class*='detail'], [aria-label]"
+            ):
+                text = el.get_text(" ", strip=True)
+                if text and text not in context_parts:
+                    context_parts.append(text)
+            bbc_context = " | ".join(context_parts) if context_parts else ""
+
             fixture = {
                 "home_team_display": home_name,
                 "away_team_display": away_name,
@@ -163,6 +177,7 @@ def fetch_from_bbc(target_date: str) -> list[dict]:
                 "status": status,
                 "season_week": "",
                 "venue_name": "",
+                "bbc_context": bbc_context,
                 "result": {
                     "scores": {
                         "home": {"total": home_score},
@@ -175,6 +190,28 @@ def fetch_from_bbc(target_date: str) -> list[dict]:
             continue
 
     return fixtures
+
+
+def _bbc_context_map(bbc_fixtures: list[dict]) -> dict[tuple, str]:
+    """Return a lookup of (home_team, away_team) -> bbc_context string."""
+    result = {}
+    for fix in bbc_fixtures:
+        key = (fix["home_team_display"], fix["away_team_display"])
+        result[key] = fix.get("bbc_context", "")
+    return result
+
+
+def merge_with_bbc(opticodds_fixtures: list[dict], bbc_fixtures: list[dict]) -> list[dict]:
+    """
+    Enrich Optic Odds fixtures with BBC Sport context.
+    Optic Odds is the authoritative source for structure/scores; BBC adds
+    any extra detail (scorers, attendance, match blurbs) via 'bbc_context'.
+    """
+    ctx = _bbc_context_map(bbc_fixtures)
+    for fix in opticodds_fixtures:
+        key = (fix.get("home_team_display", ""), fix.get("away_team_display", ""))
+        fix["bbc_context"] = ctx.get(key, "")
+    return opticodds_fixtures
 
 
 # ---------------------------------------------------------------------------
@@ -281,47 +318,89 @@ def fetch_from_flashscore(target_date: str) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
-# Main data fetch with fallback chain
+# Main data fetch — Optic Odds + BBC Sport run simultaneously
 # ---------------------------------------------------------------------------
 
 def get_today_fixtures() -> tuple[list[dict], str]:
     """
-    Fetch EPL fixtures for today using a fallback chain:
-      1. Optic Odds API via n8n proxy  (primary — structured, reliable)
-      2. Optic Odds API direct          (production fallback)
-      3. BBC Sport scraper              (web scrape fallback)
-      4. FlashScore mobile scraper      (last web scrape resort)
-      5. Pre-fetched local file         (offline fallback)
+    Fetch EPL fixtures for today.
+
+    Optic Odds (via n8n proxy or direct) and BBC Sport are fetched in parallel.
+    Optic Odds is the authoritative source for fixture structure and scores;
+    BBC Sport enriches each fixture with additional context (scorers, attendance,
+    match blurbs) stored in the 'bbc_context' field passed to Claude.
+
+    Full priority:
+      1+3. Optic Odds (n8n proxy) + BBC Sport  — simultaneous (primary)
+      2+3. Optic Odds (direct)   + BBC Sport  — simultaneous (production fallback)
+        4. FlashScore mobile scraper           — fallback if both above fail
+        5. Pre-fetched local file              — offline fallback
     """
     today = date.today().isoformat()
 
-    # 1. Optic Odds via n8n proxy
-    try:
-        fixtures = fetch_fixtures_via_proxy(today)
-        print(f"Fetched {len(fixtures)} fixture(s) via n8n Optic Odds proxy for {today}")
-        return fixtures, "Optic Odds API (n8n proxy)"
-    except Exception as e:
-        print(f"n8n proxy unavailable: {e}", file=sys.stderr)
+    def _try_opticodds_proxy():
+        return fetch_fixtures_via_proxy(today)
 
-    # 2. Optic Odds direct
-    if OPTICODDS_KEY:
+    def _try_opticodds_direct():
+        return fetch_fixtures_direct(today) if OPTICODDS_KEY else None
+
+    def _try_bbc():
+        return fetch_from_bbc(today)
+
+    # --- Attempt 1: n8n proxy + BBC Sport in parallel ---
+    opticodds_fixtures = bbc_fixtures = None
+    with ThreadPoolExecutor(max_workers=2) as ex:
+        fut_odds = ex.submit(_try_opticodds_proxy)
+        fut_bbc = ex.submit(_try_bbc)
+
         try:
-            fixtures = fetch_fixtures_direct(today)
-            print(f"Fetched {len(fixtures)} fixture(s) directly from Optic Odds for {today}")
-            return fixtures, "Optic Odds API (direct)"
+            opticodds_fixtures = fut_odds.result()
+            print(f"Fetched {len(opticodds_fixtures)} fixture(s) via n8n Optic Odds proxy")
+        except Exception as e:
+            print(f"n8n proxy unavailable: {e}", file=sys.stderr)
+
+        try:
+            bbc_fixtures = fut_bbc.result()
+            print(f"Fetched {len(bbc_fixtures)} fixture(s) from BBC Sport")
+        except Exception as e:
+            print(f"BBC Sport unavailable: {e}", file=sys.stderr)
+
+    if opticodds_fixtures is not None:
+        if bbc_fixtures:
+            opticodds_fixtures = merge_with_bbc(opticodds_fixtures, bbc_fixtures)
+            return opticodds_fixtures, "Optic Odds API (n8n proxy) + BBC Sport"
+        return opticodds_fixtures, "Optic Odds API (n8n proxy)"
+
+    # --- Attempt 2: direct Optic Odds + BBC Sport in parallel ---
+    with ThreadPoolExecutor(max_workers=2) as ex:
+        fut_odds = ex.submit(_try_opticodds_direct)
+        fut_bbc = ex.submit(_try_bbc) if bbc_fixtures is None else None
+
+        try:
+            opticodds_fixtures = fut_odds.result()
+            if opticodds_fixtures is not None:
+                print(f"Fetched {len(opticodds_fixtures)} fixture(s) directly from Optic Odds")
         except Exception as e:
             print(f"Optic Odds direct unavailable: {e}", file=sys.stderr)
 
-    # 3. BBC Sport
-    try:
-        fixtures = fetch_from_bbc(today)
-        if fixtures:
-            print(f"Fetched {len(fixtures)} fixture(s) from BBC Sport")
-            return fixtures, "BBC Sport"
-    except Exception as e:
-        print(f"BBC Sport unavailable: {e}", file=sys.stderr)
+        if fut_bbc is not None:
+            try:
+                bbc_fixtures = fut_bbc.result()
+                print(f"Fetched {len(bbc_fixtures)} fixture(s) from BBC Sport")
+            except Exception as e:
+                print(f"BBC Sport unavailable: {e}", file=sys.stderr)
 
-    # 4. FlashScore
+    if opticodds_fixtures is not None:
+        if bbc_fixtures:
+            opticodds_fixtures = merge_with_bbc(opticodds_fixtures, bbc_fixtures)
+            return opticodds_fixtures, "Optic Odds API (direct) + BBC Sport"
+        return opticodds_fixtures, "Optic Odds API (direct)"
+
+    # --- Attempt 3: BBC Sport alone (already fetched above) ---
+    if bbc_fixtures:
+        return bbc_fixtures, "BBC Sport"
+
+    # --- Attempt 4: FlashScore ---
     try:
         fixtures = fetch_from_flashscore(today)
         if fixtures:
@@ -330,7 +409,7 @@ def get_today_fixtures() -> tuple[list[dict], str]:
     except Exception as e:
         print(f"FlashScore unavailable: {e}", file=sys.stderr)
 
-    # 5. Local fallback file
+    # --- Attempt 5: local file ---
     if os.path.exists(FIXTURES_FALLBACK):
         fixtures = load_fixtures_from_file(FIXTURES_FALLBACK)
         print(f"Loaded {len(fixtures)} fixture(s) from fallback file")
@@ -400,20 +479,28 @@ def generate_summary(client: Anthropic, completed: list[dict], scheduled: list[d
         lines = []
         for fix in completed:
             score = score_str(fix)
-            lines.append(
+            line = (
                 f"- {fix['home_team_display']} {score} {fix['away_team_display']}"
                 f" (GW{fix.get('season_week','?')}, {fix.get('venue_name','')})"
             )
+            ctx = fix.get("bbc_context", "").strip()
+            if ctx:
+                line += f"\n  BBC context: {ctx}"
+            lines.append(line)
         completed_text = "COMPLETED MATCHES:\n" + "\n".join(lines)
 
     scheduled_text = ""
     if scheduled:
         lines = []
         for fix in scheduled:
-            lines.append(
+            line = (
                 f"- {fix['home_team_display']} vs {fix['away_team_display']}"
                 f" at {format_kickoff(fix['start_date'])} (GW{fix.get('season_week','?')}, {fix.get('venue_name','')})"
             )
+            ctx = fix.get("bbc_context", "").strip()
+            if ctx:
+                line += f"\n  BBC context: {ctx}"
+            lines.append(line)
         scheduled_text = "SCHEDULED (NOT YET PLAYED):\n" + "\n".join(lines)
 
     data_section = "\n\n".join(filter(None, [completed_text, scheduled_text]))

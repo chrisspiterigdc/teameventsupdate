@@ -20,15 +20,15 @@ Posts **only** to channel `C0AVBC6256C`. This is hardcoded and should not be cha
 
 ## Data Sources
 
-The script tries each source in order, moving to the next if one fails:
+Optic Odds and BBC Sport are always fetched **simultaneously**. Optic Odds is the authoritative source for fixture structure and scores; BBC Sport enriches each fixture with additional context (goal scorers, attendance, match blurbs) that is passed to Claude when generating summaries.
 
 | Priority | Source | Method |
 |---|---|---|
-| 1 | **Optic Odds API** | n8n proxy workflow `2Ki8OH2pDXd7J0DI` at `/webhook/opticodds-proxy` — no API key needed in the request, credentials stored in n8n |
-| 2 | **Optic Odds API** | Direct HTTP call using `OPTICODDS_KEY` env var |
-| 3 | **BBC Sport** | Scrapes `bbc.com/sport/football/premier-league/scores-fixtures/{date}` using BeautifulSoup |
-| 4 | **FlashScore** | Scrapes `flashscore.mobi` mobile site using BeautifulSoup (may be unreliable if page structure changes) |
-| 5 | **Local file** | Reads `/tmp/epl_fixtures_today.json` as an offline fallback |
+| 1 + 3 | **Optic Odds (n8n proxy) + BBC Sport** | Fetched in parallel — primary path |
+| 2 + 3 | **Optic Odds (direct) + BBC Sport** | Fetched in parallel — production fallback |
+| 4 | **BBC Sport alone** | If Optic Odds fails entirely but BBC succeeded |
+| 5 | **FlashScore** | Scrapes `flashscore.mobi` mobile site using BeautifulSoup |
+| 6 | **Local file** | Reads `/tmp/epl_fixtures_today.json` as an offline fallback |
 
 ### n8n Optic Odds proxy
 
