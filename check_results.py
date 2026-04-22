@@ -85,7 +85,7 @@ def _mock_matches(today: str) -> list:
     return matches
 
 
-def generate_supporter_summary(team: str, match: dict, client: anthropic.Anthropic) -> str:
+def generate_team_news(team: str, match: dict, client: anthropic.Anthropic) -> str:
     home = canonical(match["homeTeam"]["name"])
     away = canonical(match["awayTeam"]["name"])
     hg = match["score"]["fullTime"]["home"]
@@ -100,25 +100,28 @@ def generate_supporter_summary(team: str, match: dict, client: anthropic.Anthrop
     venue = "home" if is_home else "away"
 
     if team_goals > opp_goals:
-        result, emoji = "WIN", "🎉"
+        result = "win"
     elif team_goals == opp_goals:
-        result, emoji = "DRAW", "🤝"
+        result = "draw"
     else:
-        result, emoji = "LOSS", "😞"
+        result = "defeat"
 
     prompt = (
-        f"Write a 2-3 sentence match summary for supporters of {team}. "
-        f"Match: {home} {hg}-{ag} {away} (HT: {ht_h}-{ht_a}). "
-        f"{team} played {venue} and got a {result} ({team_goals}-{opp_goals} vs {opponent}). "
-        "Be passionate and honest. No excessive punctuation or emoji."
+        f"Write a short 'Latest {team} News' blurb for a football betting information website. "
+        f"Base it on this result: {team} {('won' if result == 'win' else 'drew' if result == 'draw' else 'lost')} "
+        f"{team_goals}-{opp_goals} {venue} to {opponent} (HT: {ht_h if is_home else ht_a}-{ht_a if is_home else ht_h}). "
+        "Write 2-3 short paragraphs in a neutral, journalistic third-person tone — like an editor summarising "
+        "the team's recent situation for someone visiting their team page. Cover the result and what it means "
+        "for the team's form or league position, and end with a brief forward-looking note. "
+        "Do not use headers, bullet points, emoji, or first-person language. Plain prose only."
     )
     msg = client.messages.create(
         model="claude-sonnet-4-6",
-        max_tokens=200,
+        max_tokens=300,
         messages=[{"role": "user", "content": prompt}],
     )
-    summary = msg.content[0].text.strip()
-    return f"{emoji} *{team}* — {result} {team_goals}-{opp_goals} vs {opponent}\n{summary}"
+    blurb = msg.content[0].text.strip()
+    return f"*Latest {team} News*\n{blurb}"
 
 
 def post(text: str, slack: WebClient | None) -> None:
@@ -175,7 +178,7 @@ def main() -> None:
                 continue
             print(f"Generating summary for {team} ...")
             try:
-                summary = generate_supporter_summary(team, match, claude)
+                summary = generate_team_news(team, match, claude)
                 post(summary, slack)
                 count += 1
             except Exception as exc:
