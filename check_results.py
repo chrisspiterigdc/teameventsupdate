@@ -56,7 +56,7 @@ The piece should cover:
 4. A forward-looking line about what comes next
 
 Tone: authoritative football journalist, engaging but factual.
-Format: Start with the heading "Latest {team} News" on its own line, then a punchy one-line sub-headline (question or statement), then 3–4 short paragraphs.
+Format: Start with the heading "Latest {team} News" on its own line, then a punchy one-line sub-headline. Vary the style naturally, like a sports editor would. Sometimes a bold statement, sometimes a teaser, sometimes straight context. Not always a question. Never use em dashes (—) anywhere in the text. Then 3-4 short paragraphs.
 Constraint: Only include facts you are genuinely confident are accurate. Do not fabricate statistics, scorelines, or events."""
 
 
