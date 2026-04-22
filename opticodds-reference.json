@@ -1,0 +1,180 @@
+{
+  "_notes": "Reference for all known OpticOdds API v3 endpoints. Base URL: https://api.opticodds.com/api/v3. Auth: X-Api-Key header.",
+  "baseUrl": "https://api.opticodds.com/api/v3",
+  "auth": {
+    "header": "X-Api-Key",
+    "value": "<your OpticOdds API key>"
+  },
+
+  "endpoints": {
+
+    "reference_lookup": {
+      "_note": "Call these once manually to discover slugs, IDs, and available options before configuring the workflow.",
+
+      "GET /sports": {
+        "description": "All sports available in OpticOdds",
+        "params": {},
+        "use": "Find the sport slug to use in other endpoints — e.g. 'soccer'"
+      },
+      "GET /sports/active": {
+        "description": "Only sports currently active (have upcoming fixtures)",
+        "params": {},
+        "use": "Narrowed list of active sports"
+      },
+      "GET /leagues": {
+        "description": "All leagues for a given sport",
+        "params": {
+          "sport": "string — e.g. 'soccer'"
+        },
+        "use": "Find the league slug for LEAGUE_SLUG in the workflow — look for 'id' or 'slug' in the response"
+      },
+      "GET /leagues/active": {
+        "description": "Leagues with upcoming fixtures",
+        "params": {
+          "sport": "string"
+        },
+        "use": "Narrowed list; useful to confirm your league is currently active"
+      },
+      "GET /sportsbooks": {
+        "description": "All sportsbooks tracked by OpticOdds",
+        "params": {},
+        "use": "Needed if adding odds data — find the sportsbook ID/slug to filter odds"
+      },
+      "GET /sportsbooks/active": {
+        "description": "Sportsbooks currently returning odds",
+        "params": {},
+        "use": "Narrowed list for live odds work"
+      },
+      "GET /sportsbooks/last-polled": {
+        "description": "Timestamp of last odds poll per sportsbook",
+        "params": {},
+        "use": "Check freshness of odds data before relying on it"
+      },
+      "GET /markets": {
+        "description": "All betting markets available",
+        "params": {
+          "sport": "string (optional)"
+        },
+        "use": "Discover market keys (e.g. 'h2h', 'spreads', 'totals') if adding odds to the workflow"
+      },
+      "GET /markets/active": {
+        "description": "Markets currently with open odds",
+        "params": {
+          "sport": "string (optional)"
+        },
+        "use": "Narrowed list for live odds work"
+      },
+      "GET /markets/settleable": {
+        "description": "Markets that have closed and can be settled",
+        "params": {},
+        "use": "Post-match odds settlement tracking"
+      },
+      "GET /market-types": {
+        "description": "Categories/types of markets (e.g. game lines, player props)",
+        "params": {},
+        "use": "Discover market type IDs for filtering odds requests"
+      }
+    },
+
+    "used_in_workflow": {
+      "_note": "These endpoints are called by the n8n workflow nodes.",
+
+      "GET /fixtures/results": {
+        "description": "Completed fixtures with scores, events, and stats",
+        "node": "Fetch Finished Matches",
+        "params": {
+          "sport": "soccer",
+          "league": "<LEAGUE_SLUG>",
+          "start_date": "yyyy-MM-dd",
+          "end_date": "yyyy-MM-dd"
+        },
+        "response_fields": {
+          "data[]": "Array of fixture result objects",
+          "data[].fixture": "Core fixture info",
+          "data[].fixture.id": "Fixture ID",
+          "data[].fixture.start_date": "ISO timestamp",
+          "data[].fixture.home_competitors[0].id": "Home team ID",
+          "data[].fixture.home_competitors[0].name": "Home team name",
+          "data[].fixture.home_team_display": "Home team display name (preferred)",
+          "data[].fixture.away_competitors[0].id": "Away team ID",
+          "data[].fixture.away_team_display": "Away team display name (preferred)",
+          "data[].scores.home.total": "Home total goals",
+          "data[].scores.away.total": "Away total goals",
+          "data[].events[]": "Goal/card/sub events — check type, team_id/competitor_id, player_name/player.name",
+          "data[].stats.home[]": "Home stats array — filter by period='all' for full-match",
+          "data[].stats.away[]": "Away stats array — filter by period='all' for full-match",
+          "data[].stats.home[].stats": "Object of stat key/value pairs (shots, possession, corners, etc.)",
+          "data[].league.name": "Competition name"
+        }
+      },
+
+      "GET /fixtures": {
+        "description": "Upcoming fixtures",
+        "node": "Fetch Next Match",
+        "params": {
+          "sport": "soccer",
+          "team_id": "<opticodds team ID>",
+          "start_date": "yyyy-MM-dd",
+          "limit": "1"
+        },
+        "response_fields": {
+          "data[]": "Array of upcoming fixture objects (same structure as fixtures/results without scores)",
+          "data[].fixture.home_competitors[0].id": "Use to determine if team is home or away",
+          "data[].fixture.start_date": "Match date/time",
+          "data[].league.name": "Competition name"
+        }
+      },
+
+      "GET /injuries": {
+        "description": "Current injury list for a team",
+        "node": "Fetch Team Injuries",
+        "params": {
+          "sport": "soccer",
+          "league": "<LEAGUE_SLUG>",
+          "team_id": "<opticodds team ID>"
+        },
+        "response_fields": {
+          "data[]": "Array of injury records",
+          "data[].player.name": "Player name",
+          "data[].player.position": "Player position",
+          "data[].status": "e.g. 'Out', 'Questionable', 'Doubtful'",
+          "data[].type": "Injury type/description"
+        }
+      },
+
+      "GET /teams": {
+        "description": "Team info including OpticOdds team IDs",
+        "node": "Not currently in workflow — use manually to discover team IDs",
+        "params": {
+          "sport": "soccer",
+          "league": "<LEAGUE_SLUG>"
+        },
+        "response_fields": {
+          "data[].id": "OpticOdds team ID — use this in team-config.json opticoddsId",
+          "data[].name": "Team name",
+          "data[].display_name": "Display name"
+        }
+      },
+
+      "GET /players": {
+        "description": "Player roster for a team",
+        "node": "Not currently in workflow — available for future enrichment",
+        "params": {
+          "sport": "soccer",
+          "team_id": "<opticodds team ID>"
+        },
+        "response_fields": {
+          "data[].id": "Player ID",
+          "data[].name": "Player name",
+          "data[].position": "Position"
+        }
+      }
+    },
+
+    "potential_additions": {
+      "_note": "Endpoints not yet in the workflow but could add value.",
+      "odds": "GET /odds — live/pre-match odds, requires sportsbook + market params",
+      "scores_live": "GET /scores — live in-play scores if real-time updates needed"
+    }
+  }
+}
