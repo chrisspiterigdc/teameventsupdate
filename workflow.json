@@ -62,7 +62,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// NOTE: verify field names against your first live API response.\n// OpticOdds may use home_score/away_score or score.home/score.away depending on endpoint version.\nconst fixtures = $input.first().json.data || [];\nconst teams = [];\nfor (const fixture of fixtures) {\n  const homeScore = fixture.home_score ?? fixture.score?.home ?? fixture.scores?.home ?? 0;\n  const awayScore = fixture.away_score ?? fixture.score?.away ?? fixture.scores?.away ?? 0;\n  const homeName = fixture.home_team_display || fixture.home_team;\n  const awayName = fixture.away_team_display || fixture.away_team;\n  const homeId   = fixture.home_team_id   || fixture.home_team;\n  const awayId   = fixture.away_team_id   || fixture.away_team;\n  teams.push({\n    teamId: homeId,\n    teamName: homeName,\n    opponentName: awayName,\n    isHome: true,\n    goalsFor: homeScore,\n    goalsAgainst: awayScore,\n    matchId: fixture.id,\n    matchDate: fixture.start_date,\n    competition: fixture.league\n  });\n  teams.push({\n    teamId: awayId,\n    teamName: awayName,\n    opponentName: homeName,\n    isHome: false,\n    goalsFor: awayScore,\n    goalsAgainst: homeScore,\n    matchId: fixture.id,\n    matchDate: fixture.start_date,\n    competition: fixture.league\n  });\n}\nreturn teams.map(t => ({ json: t }));"
+        "jsCode": "const fixtures = $input.first().json.data || [];\nconst teams = [];\nfor (const fixture of fixtures) {\n  const f = fixture.fixture || {};\n  const homeScore = fixture.scores?.home?.total ?? 0;\n  const awayScore = fixture.scores?.away?.total ?? 0;\n  const homeId   = f.home_competitors?.[0]?.id;\n  const awayId   = f.away_competitors?.[0]?.id;\n  const homeName = f.home_team_display || f.home_competitors?.[0]?.name;\n  const awayName = f.away_team_display || f.away_competitors?.[0]?.name;\n  const events   = fixture.events || [];\n  const homeStats = (fixture.stats?.home || []).find(s => s.period === 'all')?.stats || {};\n  const awayStats = (fixture.stats?.away || []).find(s => s.period === 'all')?.stats || {};\n  const competition = fixture.league?.name || fixture.league?.id || '';\n  teams.push({ teamId: homeId, teamName: homeName, opponentName: awayName, opponentId: awayId, isHome: true,  goalsFor: homeScore, goalsAgainst: awayScore, matchId: f.id, matchDate: f.start_date, competition, events, myStats: homeStats, oppStats: awayStats });\n  teams.push({ teamId: awayId, teamName: awayName, opponentName: homeName, opponentId: homeId, isHome: false, goalsFor: awayScore, goalsAgainst: homeScore, matchId: f.id, matchDate: f.start_date, competition, events, myStats: awayStats, oppStats: homeStats });\n}\nreturn teams.map(t => ({ json: t }));"
       },
       "id": "node-004",
       "name": "Extract Teams From Matches",
@@ -80,7 +80,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// CONFIGURE: map team display names to post IDs + groups.\n// Names must match home_team_display / away_team_display from OpticOdds.\n// Run once, inspect Extract Teams output to confirm exact names, then update this map.\nconst TEAM_MAP = {\n  // \"Exact Team Name\": { postId: 0, group: \"Group Name\" },\n  \"Manchester United\": { postId: 101, group: \"Group A\" },\n  \"Arsenal\":           { postId: 102, group: \"Group B\" },\n  \"Chelsea\":           { postId: 103, group: \"Group B\" },\n  \"Liverpool\":         { postId: 104, group: \"Group A\" }\n};\nconst data = $input.first().json;\nconst config = TEAM_MAP[data.teamName];\nif (!config) {\n  return [{ json: { ...data, postId: null, skip: true } }];\n}\nreturn [{ json: { ...data, postId: config.postId, group: config.group, skip: false } }];"
+        "jsCode": "// CONFIGURE: map team display names to post IDs + groups.\n// Names must match home_team_display / away_team_display from OpticOdds exactly.\n// Do a test run first and inspect Extract Teams output to confirm the exact strings.\nconst TEAM_MAP = {\n  // \"Exact Team Name\": { postId: 0, group: \"Group Name\" },\n  \"Manchester United\": { postId: 101, group: \"Group A\" },\n  \"Arsenal\":           { postId: 102, group: \"Group B\" },\n  \"Chelsea\":           { postId: 103, group: \"Group B\" },\n  \"Liverpool\":         { postId: 104, group: \"Group A\" }\n};\nconst data = $input.first().json;\nconst config = TEAM_MAP[data.teamName];\nif (!config) {\n  return [{ json: { ...data, postId: null, skip: true } }];\n}\nreturn [{ json: { ...data, postId: config.postId, group: config.group, skip: false } }];"
       },
       "id": "node-006",
       "name": "Team Lookup",
@@ -139,23 +139,49 @@
     },
     {
       "parameters": {
-        "jsCode": "const teamData = $('Team Lookup').first().json;\nconst nextMatchResp = $input.first().json;\nconst nextFixtures = nextMatchResp.data || [];\nconst nextFixture = nextFixtures[0] || null;\nlet nextOpponent = 'TBD', nextMatchDate = null, nextCompetition = 'TBD';\nif (nextFixture) {\n  const myId = teamData.teamId;\n  const homeId = nextFixture.home_team_id || nextFixture.home_team;\n  const isHome = homeId === myId;\n  nextOpponent = isHome\n    ? (nextFixture.away_team_display || nextFixture.away_team)\n    : (nextFixture.home_team_display || nextFixture.home_team);\n  nextMatchDate = nextFixture.start_date;\n  nextCompetition = nextFixture.league || 'TBD';\n}\nconst { goalsFor, goalsAgainst } = teamData;\nconst result = goalsFor > goalsAgainst ? 'WIN' : goalsFor < goalsAgainst ? 'LOSS' : 'DRAW';\nreturn [{ json: { ...teamData, result, nextOpponent, nextMatchDate, nextCompetition } }];"
+        "method": "GET",
+        "url": "https://api.opticodds.com/api/v3/injuries",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Api-Key", "value": "={{ $vars.OPTICODDS_KEY }}" }
+          ]
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "sport",   "value": "soccer" },
+            { "name": "league",  "value": "={{ $vars.LEAGUE_SLUG }}" },
+            { "name": "team_id", "value": "={{ $('Team Lookup').first().json.teamId }}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-021",
+      "name": "Fetch Team Injuries",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2000, 80]
+    },
+    {
+      "parameters": {
+        "jsCode": "const teamData = $('Team Lookup').first().json;\nconst nextMatchResp = $('Fetch Next Match').first().json;\nconst injuriesResp = $input.first().json;\n\nconst nextFixtures = nextMatchResp.data || [];\nconst nextFixture = nextFixtures[0] || null;\nlet nextOpponent = 'TBD', nextMatchDate = null, nextCompetition = 'TBD';\nif (nextFixture) {\n  const nf = nextFixture.fixture || {};\n  const homeId = nf.home_competitors?.[0]?.id;\n  const isHome = homeId === teamData.teamId;\n  nextOpponent = isHome\n    ? (nf.away_team_display || nf.away_competitors?.[0]?.name || 'TBD')\n    : (nf.home_team_display || nf.home_competitors?.[0]?.name || 'TBD');\n  nextMatchDate = nf.start_date;\n  nextCompetition = nextFixture.league?.name || 'TBD';\n}\n\nconst injuries = (injuriesResp.data || [])\n  .filter(inj => inj.player?.name)\n  .slice(0, 5)\n  .map(inj => ({ name: inj.player.name, position: inj.player.position || '', status: inj.status, type: inj.type }));\n\nconst goalEvents = (teamData.events || []).filter(e => {\n  const t = (e.type || e.event_type || '').toLowerCase();\n  return t.includes('goal') && (e.team_id === teamData.teamId || e.competitor_id === teamData.teamId);\n});\nconst goalScorers = goalEvents.map(e => e.player_name || e.player?.name).filter(Boolean);\n\nconst { goalsFor, goalsAgainst } = teamData;\nconst result = goalsFor > goalsAgainst ? 'WIN' : goalsFor < goalsAgainst ? 'LOSS' : 'DRAW';\nreturn [{ json: { ...teamData, result, nextOpponent, nextMatchDate, nextCompetition, injuries, goalScorers } }];"
       },
       "id": "node-009",
       "name": "Build Match Context",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2000, 80]
+      "position": [2220, 80]
     },
     {
       "parameters": {
-        "jsCode": "const d = $input.first().json;\nconst venue = d.isHome ? 'at home' : 'away';\nlet nextFixture = 'No upcoming match currently scheduled.';\nif (d.nextMatchDate) {\n  const dt = new Date(d.nextMatchDate);\n  const formatted = dt.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });\n  nextFixture = 'Next up: ' + d.nextOpponent + ' (' + d.nextCompetition + ') on ' + formatted + '.';\n}\nconst promptLines = [\n  'You are updating the website for ' + d.teamName + '.',\n  '',\n  'Latest result:',\n  '- Competition: ' + d.competition,\n  '- Venue: ' + venue,\n  '- Score: ' + d.teamName + ' ' + d.goalsFor + '-' + d.goalsAgainst + ' ' + d.opponentName,\n  '- Outcome: ' + d.result,\n  '- Group/Region: ' + d.group,\n  '',\n  'Upcoming fixture:',\n  nextFixture,\n  '',\n  \"Write a punchy, supporter-facing 2-3 sentence update for the team's website. Requirements:\",\n  '1. Open with the result and score',\n  '2. Capture the mood (winning energy, resilience, or fighting spirit)',\n  '3. Close with the next fixture to keep fans engaged',\n  '',\n  'Return ONLY plain text - no HTML, no markdown, no quotes.'\n];\nconst prompt = promptLines.join('\\n');\nconst claudeBody = {\n  model: 'claude-sonnet-4-6',\n  max_tokens: 256,\n  messages: [{ role: 'user', content: prompt }]\n};\nreturn [{ json: { ...d, prompt, claudeBody } }];"
+        "jsCode": "const d = $input.first().json;\nconst venue = d.isHome ? 'at home' : 'away';\nlet nextFixtureText = 'No upcoming match currently scheduled.';\nif (d.nextMatchDate) {\n  const dt = new Date(d.nextMatchDate);\n  const formatted = dt.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });\n  nextFixtureText = 'Next: ' + d.nextOpponent + ' (' + d.nextCompetition + ') — ' + formatted;\n}\nconst lines = [\n  'Update the website for ' + d.teamName + '.',\n  '',\n  'MATCH:',\n  '- ' + d.competition + ' | ' + (d.isHome ? 'Home' : 'Away') + ' vs ' + d.opponentName,\n  '- Result: ' + d.result + ' ' + d.goalsFor + '-' + d.goalsAgainst\n];\nif (d.goalScorers && d.goalScorers.length > 0) {\n  lines.push('- Goals: ' + d.goalScorers.join(', '));\n}\nif (d.myStats && Object.keys(d.myStats).length > 0) {\n  const s = d.myStats;\n  const parts = [];\n  if (s.shots !== undefined) parts.push('Shots ' + s.shots + (s.shots_on_target !== undefined ? ' (' + s.shots_on_target + ' on target)' : ''));\n  if (s.possession !== undefined) parts.push('Possession ' + s.possession + '%');\n  if (s.corners !== undefined) parts.push('Corners ' + s.corners);\n  if (parts.length > 0) lines.push('- Stats: ' + parts.join(' | '));\n}\nlines.push('', 'GROUP: ' + d.group, '', 'NEXT MATCH: ' + nextFixtureText);\nif (d.injuries && d.injuries.length > 0) {\n  lines.push('', 'INJURY LIST:');\n  d.injuries.forEach(inj => {\n    lines.push('- ' + inj.name + (inj.position ? ' (' + inj.position + ')' : '') + ': ' + inj.status + ' — ' + inj.type);\n  });\n}\nlines.push('', \"Write a punchy, supporter-facing 2-3 sentence update for the team's website. Requirements:\", '1. Open with the result and score — mention the scorer(s) if available', '2. Include a performance detail from the stats if provided', '3. Close with the next fixture', '4. If there are injuries, weave in one concern naturally', '', 'Return ONLY plain text — no HTML, no markdown, no quotes.');\nconst prompt = lines.join('\\n');\nconst claudeBody = { model: 'claude-sonnet-4-6', max_tokens: 300, messages: [{ role: 'user', content: prompt }] };\nreturn [{ json: { ...d, prompt, claudeBody } }];"
       },
       "id": "node-010",
       "name": "Build Claude Prompt",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2220, 80]
+      "position": [2440, 80]
     },
     {
       "parameters": {
@@ -178,17 +204,17 @@
       "name": "Claude API Call",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2440, 80]
+      "position": [2660, 80]
     },
     {
       "parameters": {
-        "jsCode": "const claudeResp = $input.first().json;\nconst promptData = $('Build Claude Prompt').first().json;\nconst generatedContent = claudeResp.content?.[0]?.text?.trim() || '';\nif (!generatedContent) {\n  throw new Error('Claude returned empty content for ' + promptData.teamName);\n}\nconst resultEmoji = promptData.result === 'WIN' ? ':white_check_mark:' : promptData.result === 'LOSS' ? ':x:' : ':heavy_minus_sign:';\nconst scoreText = promptData.goalsFor + '-' + promptData.goalsAgainst;\nconst slackBody = {\n  text: promptData.teamName + ' | ' + promptData.result + ' ' + scoreText + ' vs ' + promptData.opponentName,\n  blocks: [\n    {\n      type: 'header',\n      text: { type: 'plain_text', text: promptData.teamName + '  |  ' + promptData.result + ' ' + scoreText, emoji: true }\n    },\n    {\n      type: 'section',\n      text: {\n        type: 'mrkdwn',\n        text: resultEmoji + '  *vs ' + promptData.opponentName + '*  (' + promptData.competition + ')\\n\\n' + generatedContent\n      }\n    },\n    {\n      type: 'context',\n      elements: [\n        {\n          type: 'mrkdwn',\n          text: 'Group: ' + promptData.group + (promptData.nextOpponent !== 'TBD' ? '  |  Next: ' + promptData.nextOpponent + ' (' + promptData.nextCompetition + ')' : '  |  No upcoming match scheduled')\n        }\n      ]\n    }\n  ]\n};\nreturn [{ json: { ...promptData, generatedContent, slackBody } }];"
+        "jsCode": "const claudeResp = $input.first().json;\nconst promptData = $('Build Claude Prompt').first().json;\nconst generatedContent = claudeResp.content?.[0]?.text?.trim() || '';\nif (!generatedContent) {\n  throw new Error('Claude returned empty content for ' + promptData.teamName);\n}\nconst resultEmoji = promptData.result === 'WIN' ? ':white_check_mark:' : promptData.result === 'LOSS' ? ':x:' : ':heavy_minus_sign:';\nconst scoreText = promptData.goalsFor + '-' + promptData.goalsAgainst;\nconst scorerLine = promptData.goalScorers?.length > 0 ? '⚽  ' + promptData.goalScorers.join(', ') : null;\nconst injuryLine = promptData.injuries?.length > 0 ? '🩹  ' + promptData.injuries.map(i => i.name + ' (' + i.status + ')').join(', ') : null;\nconst contextParts = ['Group: ' + promptData.group];\nif (promptData.nextOpponent !== 'TBD') contextParts.push('Next: ' + promptData.nextOpponent + ' (' + promptData.nextCompetition + ')');\nif (injuryLine) contextParts.push('Injuries: ' + promptData.injuries.length);\nconst slackBody = {\n  text: promptData.teamName + ' | ' + promptData.result + ' ' + scoreText + ' vs ' + promptData.opponentName,\n  blocks: [\n    { type: 'header', text: { type: 'plain_text', text: promptData.teamName + '  |  ' + promptData.result + ' ' + scoreText, emoji: true } },\n    { type: 'section', text: { type: 'mrkdwn', text: resultEmoji + '  *vs ' + promptData.opponentName + '*  (' + promptData.competition + ')' + (scorerLine ? '\\n' + scorerLine : '') + '\\n\\n' + generatedContent } },\n    { type: 'context', elements: [{ type: 'mrkdwn', text: contextParts.join('  |  ') }] }\n  ]\n};\nreturn [{ json: { ...promptData, generatedContent, slackBody } }];"
       },
       "id": "node-012",
       "name": "Parse Claude Response",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2660, 80]
+      "position": [2880, 80]
     },
     {
       "parameters": {
@@ -203,17 +229,17 @@
       "name": "Send Slack Message",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2880, 80]
+      "position": [3100, 80]
     },
     {
       "parameters": {
-        "jsCode": "const d = $('Parse Claude Response').first().json;\nconst ts = new Date().toISOString();\nconsole.log('[' + ts + '] OK | ' + d.teamName + ' | Slack sent | ' + d.result + ' ' + d.goalsFor + '-' + d.goalsAgainst + ' vs ' + d.opponentName);\nreturn [{ json: { success: true, timestamp: ts, team: d.teamName, result: d.result + ' ' + d.goalsFor + '-' + d.goalsAgainst, opponent: d.opponentName, competition: d.competition } }];"
+        "jsCode": "const d = $('Parse Claude Response').first().json;\nconst ts = new Date().toISOString();\nconsole.log('[' + ts + '] OK | ' + d.teamName + ' | Slack sent | ' + d.result + ' ' + d.goalsFor + '-' + d.goalsAgainst + ' vs ' + d.opponentName);\nreturn [{ json: { success: true, timestamp: ts, team: d.teamName, result: d.result + ' ' + d.goalsFor + '-' + d.goalsAgainst, opponent: d.opponentName, competition: d.competition, goalScorers: d.goalScorers, injuries: (d.injuries || []).length } }];"
       },
       "id": "node-016",
       "name": "Log Success",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [3100, 80]
+      "position": [3320, 80]
     },
     {
       "parameters": {},
@@ -241,9 +267,9 @@
     },
     {
       "parameters": {
-        "content": "## SETUP — Read Before Activating\n\n### 1. Variables (hardcode directly in each node if your n8n plan doesn't support Variables)\n\n| Variable | Value |\n|---|---|\n| `OPTICODDS_KEY` | Your key from OpticOdds dashboard |\n| `LEAGUE_SLUG` | League identifier from OpticOdds — call `GET /api/v3/leagues?sport=soccer` to find it |\n| `CLAUDE_API_KEY` | Anthropic key from console.anthropic.com |\n| `SLACK_WEBHOOK_URL` | Incoming Webhook URL from api.slack.com/apps |\n\n### 2. Find Your League Slug\nCall `https://api.opticodds.com/api/v3/leagues?sport=soccer` with your API key. Find your competition in the response and copy its `id` or `slug` field into `LEAGUE_SLUG`.\n\n### 3. Team Map + Exact Names\nDo a test run first. Inspect the **Extract Teams From Matches** node output to see the exact `teamName` values OpticOdds returns. Then update the **Team Lookup** Code node map with those exact names and your post IDs. See `team-config.json` for the structure.\n\n### 4. Score Fields\nIf scores come back as 0-0 on real data, open **Extract Teams From Matches** and check the raw fixture object. Adjust the score field path (`home_score`, `score.home`, etc.) to match what OpticOdds actually returns.",
-        "height": 460,
-        "width": 620,
+        "content": "## SETUP — Read Before Activating\n\n### 1. Variables (hardcode in each node if plan doesn't support Variables)\n\n| Variable | Value |\n|---|---|\n| `OPTICODDS_KEY` | Your key from OpticOdds dashboard |\n| `LEAGUE_SLUG` | League ID from `GET /api/v3/leagues?sport=soccer` |\n| `CLAUDE_API_KEY` | Anthropic key from console.anthropic.com |\n| `SLACK_WEBHOOK_URL` | Incoming Webhook URL from api.slack.com/apps |\n\n### 2. Team Map\nEdit **Team Lookup** with your team display names (check Extract Teams output after a test run to get exact strings) and post IDs.\n\n### 3. Data enrichment in this version\n- **Scores**: `scores.home.total` / `scores.away.total`\n- **Goal scorers**: parsed from `events[]` — field names may vary; check Build Match Context if scorers are empty\n- **Stats**: shots, possession, corners from `stats[].stats` — adjust field names if needed (see note below)\n- **Injuries**: live injury list for each team fetched from `/injuries`\n\n### 4. Verify stat field names\nSoccer stat keys in `myStats` may differ from baseball (e.g. `shots_on_goal` vs `shots_on_target`, `ball_possession` vs `possession`). After a test run, open Build Claude Prompt and check what keys are present in `d.myStats`, then adjust the field names in the code.",
+        "height": 500,
+        "width": 640,
         "color": 4
       },
       "id": "node-020",
@@ -288,6 +314,9 @@
       "main": [[{ "node": "Loop: Split Teams", "type": "main", "index": 0 }]]
     },
     "Fetch Next Match": {
+      "main": [[{ "node": "Fetch Team Injuries", "type": "main", "index": 0 }]]
+    },
+    "Fetch Team Injuries": {
       "main": [[{ "node": "Build Match Context", "type": "main", "index": 0 }]]
     },
     "Build Match Context": {
@@ -318,5 +347,5 @@
     { "name": "auto-update" }
   ],
   "triggerCount": 0,
-  "versionId": "4"
+  "versionId": "5"
 }
