@@ -1,32 +1,30 @@
 #!/usr/bin/env python3
-"""Premier League match results -> Claude summary -> Slack."""
+"""Premier League match results -> Claude summary -> prints JSON for Claude to post to Slack."""
 
 import datetime
+import json
 import os
 import sys
 
 import requests
 
-# Read from environment variables if set, otherwise fall back to config.py
 try:
     import config as _cfg
-    OPTICODDS_KEY     = os.environ.get("OPTICODDS_KEY")     or _cfg.OPTICODDS_KEY
-    CLAUDE_API_KEY    = os.environ.get("CLAUDE_API_KEY")    or _cfg.CLAUDE_API_KEY
-    SLACK_WEBHOOK_URL = os.environ.get("SLACK_WEBHOOK_URL") or _cfg.SLACK_WEBHOOK_URL
+    OPTICODDS_KEY  = os.environ.get("OPTICODDS_KEY")  or _cfg.OPTICODDS_KEY
+    CLAUDE_API_KEY = os.environ.get("CLAUDE_API_KEY") or _cfg.CLAUDE_API_KEY
 except ImportError:
-    OPTICODDS_KEY     = os.environ.get("OPTICODDS_KEY", "")
-    CLAUDE_API_KEY    = os.environ.get("CLAUDE_API_KEY", "")
-    SLACK_WEBHOOK_URL = os.environ.get("SLACK_WEBHOOK_URL", "")
+    OPTICODDS_KEY  = os.environ.get("OPTICODDS_KEY", "")
+    CLAUDE_API_KEY = os.environ.get("CLAUDE_API_KEY", "")
 
 TEAMS = [
     {"teamName": "AFC Bournemouth",         "opticoddsId": "F2CCF38E0A5A"},
     {"teamName": "Arsenal",                  "opticoddsId": "48B92509529C"},
     {"teamName": "Aston Villa",              "opticoddsId": "C5F8130E6580"},
-    {"teamName": "Brentford",                "opticoddsId": "B196AD1A3F37"},
-    {"teamName": "Brighton & Hove Albion",   "opticoddsId": "263AF016D0C5"},
+    {"teamName": "Brentford",               "opticoddsId": "B196AD1A3F37"},
+    {"teamName": "Brighton & Hove Albion",  "opticoddsId": "263AF016D0C5"},
     {"teamName": "Burnley",                  "opticoddsId": "4B94C3B57377"},
     {"teamName": "Chelsea",                  "opticoddsId": "A477D0C02A28"},
-    {"teamName": "Crystal Palace",           "opticoddsId": "E22B557B1960"},
+    {"teamName": "Crystal Palace",          "opticoddsId": "E22B557B1960"},
     {"teamName": "Everton",                  "opticoddsId": "F55F77B71202"},
     {"teamName": "Fulham",                   "opticoddsId": "D6AD821C3B5E"},
     {"teamName": "Ipswich Town",             "opticoddsId": "77CBFB371ED9"},
@@ -108,9 +106,8 @@ def extract_match_info(fixture, team_id):
         opponent = f.get("home_team_display") or _first(f.get("home_competitors")).get("name", "Unknown")
 
     competition = (fixture.get("league") or {}).get("name", "")
-
-    side_stats = ((fixture.get("stats") or {}).get("home" if is_home else "away")) or []
-    my_stats = next((s.get("stats", {}) for s in side_stats if s.get("period") == "all"), {})
+    side_stats  = ((fixture.get("stats") or {}).get("home" if is_home else "away")) or []
+    my_stats    = next((s.get("stats", {}) for s in side_stats if s.get("period") == "all"), {})
 
     return {
         "is_home": is_home,
@@ -129,10 +126,11 @@ def extract_next_fixture(raw, team_id):
     nf = raw.get("fixture", {})
     nf_home_id = _first(nf.get("home_competitors")).get("id")
     nf_is_home = nf_home_id == team_id
-    if nf_is_home:
-        opponent = nf.get("away_team_display") or _first(nf.get("away_competitors")).get("name", "TBD")
-    else:
-        opponent = nf.get("home_team_display") or _first(nf.get("home_competitors")).get("name", "TBD")
+    opponent = (
+        nf.get("away_team_display") or _first(nf.get("away_competitors")).get("name", "TBD")
+        if nf_is_home else
+        nf.get("home_team_display") or _first(nf.get("home_competitors")).get("name", "TBD")
+    )
     return {
         "opponent": opponent,
         "date": nf.get("start_date"),
@@ -161,13 +159,12 @@ def build_prompt(team_name, d):
         f"- {d['competition']} | {'Home' if d['is_home'] else 'Away'} vs {d['opponent']}",
         f"- Result: {d['result']} {d['goals_for']}-{d['goals_against']}",
     ]
-
     s = d.get("stats", {})
     parts = []
-    shots   = s.get("total_scoring_att")    if s.get("total_scoring_att")    is not None else s.get("shots")
-    on_tgt  = s.get("ontarget_scoring_att") if s.get("ontarget_scoring_att") is not None else s.get("shots_on_target")
+    shots   = s.get("total_scoring_att")     if s.get("total_scoring_att")     is not None else s.get("shots")
+    on_tgt  = s.get("ontarget_scoring_att")  if s.get("ontarget_scoring_att")  is not None else s.get("shots_on_target")
     poss    = s.get("possession_percentage") if s.get("possession_percentage") is not None else s.get("possession")
-    corners = s.get("corner_taken")         if s.get("corner_taken")         is not None else s.get("corners")
+    corners = s.get("corner_taken")          if s.get("corner_taken")          is not None else s.get("corners")
     if shots   is not None: parts.append(f"Shots {shots}" + (f" ({on_tgt} on target)" if on_tgt is not None else ""))
     if poss    is not None: parts.append(f"Possession {poss}%")
     if corners is not None: parts.append(f"Corners {corners}")
@@ -224,74 +221,63 @@ def call_claude(prompt):
     return r.json()["content"][0]["text"].strip()
 
 
-def send_slack(team_name, d, generated):
-    result      = d["result"]
-    score       = f"{d['goals_for']}-{d['goals_against']}"
-    opponent    = d["opponent"]
-    competition = d.get("competition") or "Premier League"
-    next_fixture = d.get("next_fixture")
-    injuries    = d.get("injuries", [])
-
-    emoji = {"WIN": ":white_check_mark:", "LOSS": ":x:", "DRAW": ":heavy_minus_sign:"}.get(result, ":heavy_minus_sign:")
-    ctx = [competition]
-    if next_fixture:
-        ctx.append(f"Next: {next_fixture['opponent']} ({next_fixture['competition']})")
-    if injuries:
-        ctx.append(f"Injuries: {len(injuries)}")
-
-    r = requests.post(
-        SLACK_WEBHOOK_URL,
-        json={
-            "text": f"{team_name} | {result} {score} vs {opponent}",
-            "blocks": [
-                {"type": "header", "text": {"type": "plain_text", "text": f"{team_name}  |  {result} {score}", "emoji": True}},
-                {"type": "section", "text": {"type": "mrkdwn", "text": f"{emoji}  *vs {opponent}*  ({competition})\n\n{generated}"}},
-                {"type": "context", "elements": [{"type": "mrkdwn", "text": "  |  ".join(ctx)}]},
-            ],
-        },
-        timeout=10,
-    )
-    r.raise_for_status()
-
-
 def process_team(team, today, tomorrow):
     team_id   = team["opticoddsId"]
     team_name = team["teamName"]
 
     fixture = get_today_fixture(team_id, today)
     if not fixture:
-        print(f"  {team_name}: no match today")
-        return False
+        return None
 
     d = extract_match_info(fixture, team_id)
     d["next_fixture"] = extract_next_fixture(get_next_fixture(team_id, tomorrow), team_id)
     d["injuries"]     = extract_injuries(get_injuries(team_id))
 
-    prompt    = build_prompt(team_name, d)
-    generated = call_claude(prompt)
-    send_slack(team_name, d, generated)
+    summary = call_claude(build_prompt(team_name, d))
 
-    print(f"  OK  {team_name}: {d['result']} {d['goals_for']}-{d['goals_against']} vs {d['opponent']}")
-    return True
+    nf = d.get("next_fixture")
+    return {
+        "team":        team_name,
+        "result":      d["result"],
+        "score":       f"{d['goals_for']}-{d['goals_against']}",
+        "opponent":    d["opponent"],
+        "competition": d.get("competition") or "Premier League",
+        "is_home":     d["is_home"],
+        "next_opponent":    nf["opponent"]    if nf else None,
+        "next_competition": nf["competition"] if nf else None,
+        "next_date":        nf["date"]        if nf else None,
+        "injuries":    len(d.get("injuries", [])),
+        "summary":     summary,
+    }
 
 
 def main():
     placeholder = "PASTE_YOUR"
     missing = [k for k, v in [
-        ("OPTICODDS_KEY",     OPTICODDS_KEY),
-        ("CLAUDE_API_KEY",    CLAUDE_API_KEY),
-        ("SLACK_WEBHOOK_URL", SLACK_WEBHOOK_URL),
+        ("OPTICODDS_KEY",  OPTICODDS_KEY),
+        ("CLAUDE_API_KEY", CLAUDE_API_KEY),
     ] if not v or placeholder in v]
     if missing:
-        print(f"ERROR: fill in these keys in config.py: {', '.join(missing)}")
+        print(json.dumps({"error": f"Fill in these keys in config.py: {', '.join(missing)}"}))
         sys.exit(1)
 
     today    = datetime.date.today().isoformat()
     tomorrow = (datetime.date.today() + datetime.timedelta(days=1)).isoformat()
-    print(f"Checking {len(TEAMS)} Premier League teams for {today} ...")
 
-    sent = sum(1 for team in TEAMS if process_team(team, today, tomorrow))
-    print(f"\nDone - {sent} Slack message(s) sent.")
+    results = []
+    for team in TEAMS:
+        try:
+            r = process_team(team, today, tomorrow)
+            if r:
+                results.append(r)
+                print(f"  OK  {r['team']}: {r['result']} {r['score']} vs {r['opponent']}", file=sys.stderr)
+            else:
+                print(f"  --  {team['teamName']}: no match today", file=sys.stderr)
+        except Exception as e:
+            print(f"  ERR {team['teamName']}: {e}", file=sys.stderr)
+
+    # Print JSON to stdout for Claude to read and post to Slack
+    print(json.dumps(results, indent=2))
 
 
 if __name__ == "__main__":

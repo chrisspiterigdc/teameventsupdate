@@ -1,32 +1,38 @@
-# Premier League Match Results → Slack
+# Premier League Match Results -> Slack
 
-## What this routine does
+## Task
 
-Checks all 25 Premier League teams for today's completed match results, generates a punchy supporter-facing summary via Claude, and posts a formatted message to Slack for each team that played.
+Run the match results script, then post each result to Slack channel **fb-team-event-updates** (ID: C0AVBC6256C).
 
-## How to run
+## Steps
 
-```bash
-pip install -r requirements.txt
-python check_results.py
-```
+1. Install dependencies:
+   ```
+   pip install -r requirements.txt
+   ```
 
-## Required environment variables
+2. Run the script and capture JSON output:
+   ```
+   python check_results.py
+   ```
+   Progress logs go to stderr. The script prints a JSON array to stdout — one object per team that played today.
 
-Set these in your Routine settings at claude.ai/code/routines:
+3. For each item in the JSON output, post a Slack message to channel `C0AVBC6256C` using the Slack connector with this format:
 
-| Variable | Description |
-|---|---|
-| `OPTICODDS_KEY` | OpticOdds API key |
-| `CLAUDE_API_KEY` | Anthropic Claude API key |
-| `SLACK_WEBHOOK_URL` | Slack Incoming Webhook URL |
+   **Header:** `{team}  |  {result} {score}`
 
-## Recommended schedule
+   **Body:**
+   ```
+   {result emoji}  *vs {opponent}*  ({competition})
 
-Hourly — matches are checked against today's date so duplicate runs are safe.
+   {summary}
+   ```
+   Use :white_check_mark: for WIN, :x: for LOSS, :heavy_minus_sign: for DRAW.
 
-## Files
+   **Footer (context line):** `{competition}  |  Next: {next_opponent} ({next_competition})` — omit the Next part if next_opponent is null. If injuries > 0, append `  |  Injuries: {injuries}`.
 
-- `check_results.py` — main script, runs end-to-end
-- `requirements.txt` — Python dependencies (just `requests`)
-- `workflow.json` — legacy n8n workflow (kept for reference)
+4. If the JSON array is empty, do nothing — no teams played today.
+
+## Config
+
+API keys are read from `config.py` in the repo root. Edit that file to update keys.
