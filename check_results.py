@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Premier League match results -> Claude summary -> prints JSON for Claude to post to Slack."""
+"""Premier League yesterday's results -> Claude summary -> prints JSON for Claude to post to Slack."""
 
 import datetime
 import json
@@ -58,20 +58,20 @@ def opticodds_get(path, params):
     return r.json().get("data", [])
 
 
-def get_today_fixture(team_id, today):
+def get_fixture_for_date(team_id, date):
     fixtures = opticodds_get("/fixtures/results", {"sport": "soccer", "team_id": team_id})
     matches = [
         f for f in fixtures
-        if (f.get("fixture", {}).get("start_date") or f.get("start_date", "")).startswith(today)
+        if (f.get("fixture", {}).get("start_date") or f.get("start_date", "")).startswith(date)
     ]
     return matches[0] if matches else None
 
 
-def get_next_fixture(team_id, tomorrow):
+def get_next_fixture(team_id, from_date):
     fixtures = opticodds_get("/fixtures", {
         "sport": "soccer",
         "team_id": team_id,
-        "start_date": tomorrow,
+        "start_date": from_date,
         "limit": 1,
     })
     return fixtures[0] if fixtures else None
@@ -221,33 +221,33 @@ def call_claude(prompt):
     return r.json()["content"][0]["text"].strip()
 
 
-def process_team(team, today, tomorrow):
+def process_team(team, yesterday, today):
     team_id   = team["opticoddsId"]
     team_name = team["teamName"]
 
-    fixture = get_today_fixture(team_id, today)
+    fixture = get_fixture_for_date(team_id, yesterday)
     if not fixture:
         return None
 
     d = extract_match_info(fixture, team_id)
-    d["next_fixture"] = extract_next_fixture(get_next_fixture(team_id, tomorrow), team_id)
+    d["next_fixture"] = extract_next_fixture(get_next_fixture(team_id, today), team_id)
     d["injuries"]     = extract_injuries(get_injuries(team_id))
 
     summary = call_claude(build_prompt(team_name, d))
 
     nf = d.get("next_fixture")
     return {
-        "team":        team_name,
-        "result":      d["result"],
-        "score":       f"{d['goals_for']}-{d['goals_against']}",
-        "opponent":    d["opponent"],
-        "competition": d.get("competition") or "Premier League",
-        "is_home":     d["is_home"],
+        "team":             team_name,
+        "result":           d["result"],
+        "score":            f"{d['goals_for']}-{d['goals_against']}",
+        "opponent":         d["opponent"],
+        "competition":      d.get("competition") or "Premier League",
+        "is_home":          d["is_home"],
         "next_opponent":    nf["opponent"]    if nf else None,
         "next_competition": nf["competition"] if nf else None,
         "next_date":        nf["date"]        if nf else None,
-        "injuries":    len(d.get("injuries", [])),
-        "summary":     summary,
+        "injuries":         len(d.get("injuries", [])),
+        "summary":          summary,
     }
 
 
@@ -261,22 +261,23 @@ def main():
         print(json.dumps({"error": f"Fill in these keys in config.py: {', '.join(missing)}"}))
         sys.exit(1)
 
-    today    = datetime.date.today().isoformat()
-    tomorrow = (datetime.date.today() + datetime.timedelta(days=1)).isoformat()
+    yesterday = (datetime.date.today() - datetime.timedelta(days=1)).isoformat()
+    today     = datetime.date.today().isoformat()
+
+    print(f"Checking {len(TEAMS)} teams for matches on {yesterday} ...", file=sys.stderr)
 
     results = []
     for team in TEAMS:
         try:
-            r = process_team(team, today, tomorrow)
+            r = process_team(team, yesterday, today)
             if r:
                 results.append(r)
                 print(f"  OK  {r['team']}: {r['result']} {r['score']} vs {r['opponent']}", file=sys.stderr)
             else:
-                print(f"  --  {team['teamName']}: no match today", file=sys.stderr)
+                print(f"  --  {team['teamName']}: no match", file=sys.stderr)
         except Exception as e:
             print(f"  ERR {team['teamName']}: {e}", file=sys.stderr)
 
-    # Print JSON to stdout for Claude to read and post to Slack
     print(json.dumps(results, indent=2))
 
 
