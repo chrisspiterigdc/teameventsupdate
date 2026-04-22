@@ -7,7 +7,7 @@ and posts them to Slack (or stdout when no SLACK_BOT_TOKEN is set).
 
 import os
 import sys
-from datetime import date
+from datetime import date, timedelta
 
 import requests
 import anthropic
@@ -155,8 +155,11 @@ def post(text: str, slack: WebClient | None) -> None:
 
 
 def main() -> None:
-    today = date.today().strftime("%Y-%m-%d")
-    print(f"Premier League results check — {today}")
+    if len(sys.argv) > 1:
+        target_date = sys.argv[1]
+    else:
+        target_date = date.today().strftime("%Y-%m-%d")
+    print(f"Premier League results check — {target_date}")
     print(f"Tracking {len(PREMIER_LEAGUE_TEAMS)} clubs\n")
 
     if not ANTHROPIC_API_KEY:
@@ -169,17 +172,17 @@ def main() -> None:
     if slack is None:
         print("SLACK_BOT_TOKEN not set — printing to stdout instead.\n")
 
-    matches = fetch_todays_matches(today)
+    matches = fetch_todays_matches(target_date)
 
     if not matches:
-        msg = f"No completed Premier League matches on {today}."
+        msg = f"No completed Premier League matches on {target_date}."
         print(msg)
         post(msg, slack)
         return
 
     print(f"Found {len(matches)} completed fixture(s).\n")
 
-    post(f":soccer: *Premier League Results — {today}*", slack)
+    post(f":soccer: *Premier League Results — {target_date}*", slack)
 
     count = 0
     for match in matches:
