@@ -13,23 +13,13 @@
     },
     {
       "parameters": {
-        "jsCode": "// EDIT THIS NODE — paste your real API keys here\nreturn [{\n  json: {\n    opticoddsKey:    \"PASTE_YOUR_OPTICODDS_KEY_HERE\",\n    claudeApiKey:    \"PASTE_YOUR_CLAUDE_API_KEY_HERE\",\n    slackWebhookUrl: \"PASTE_YOUR_SLACK_WEBHOOK_URL_HERE\"\n  }\n}];"
-      },
-      "id": "node-023",
-      "name": "Config",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [460, 300]
-    },
-    {
-      "parameters": {
-        "jsCode": "// Premier League 2025-26 — all 25 clubs returned by OpticOdds (includes recently relegated).\n// Clubs with no match today are skipped automatically.\nconst TEAMS = [\n  { teamName: \"AFC Bournemouth\",         postId: 101, opticoddsId: \"F2CCF38E0A5A\",         group: \"Premier League\" },\n  { teamName: \"Arsenal\",                 postId: 102, opticoddsId: \"48B92509529C\",         group: \"Premier League\" },\n  { teamName: \"Aston Villa\",             postId: 103, opticoddsId: \"C5F8130E6580\",         group: \"Premier League\" },\n  { teamName: \"Brentford\",               postId: 104, opticoddsId: \"B196AD1A3F37\",         group: \"Premier League\" },\n  { teamName: \"Brighton & Hove Albion\",  postId: 105, opticoddsId: \"263AF016D0C5\",         group: \"Premier League\" },\n  { teamName: \"Burnley\",                 postId: 106, opticoddsId: \"4B94C3B57377\",         group: \"Premier League\" },\n  { teamName: \"Chelsea\",                 postId: 107, opticoddsId: \"A477D0C02A28\",         group: \"Premier League\" },\n  { teamName: \"Crystal Palace\",          postId: 108, opticoddsId: \"E22B557B1960\",         group: \"Premier League\" },\n  { teamName: \"Everton\",                 postId: 109, opticoddsId: \"F55F77B71202\",         group: \"Premier League\" },\n  { teamName: \"Fulham\",                  postId: 110, opticoddsId: \"D6AD821C3B5E\",         group: \"Premier League\" },\n  { teamName: \"Ipswich Town\",            postId: 111, opticoddsId: \"77CBFB371ED9\",         group: \"Premier League\" },\n  { teamName: \"Leeds United\",            postId: 112, opticoddsId: \"EA3F3BDC929F604A\",    group: \"Premier League\" },\n  { teamName: \"Leicester City\",          postId: 113, opticoddsId: \"AF647EC9C595\",         group: \"Premier League\" },\n  { teamName: \"Liverpool\",               postId: 114, opticoddsId: \"F799E43513D4\",         group: \"Premier League\" },\n  { teamName: \"Luton Town\",              postId: 115, opticoddsId: \"982A5B2282B1\",         group: \"Premier League\" },\n  { teamName: \"Manchester City\",         postId: 116, opticoddsId: \"E69E55FFCF65\",         group: \"Premier League\" },\n  { teamName: \"Manchester United\",       postId: 117, opticoddsId: \"AF8DDBC0795A\",         group: \"Premier League\" },\n  { teamName: \"Newcastle United\",        postId: 118, opticoddsId: \"273700707FB1\",         group: \"Premier League\" },\n  { teamName: \"Nottingham Forest\",       postId: 119, opticoddsId: \"013D1D5F4D18\",         group: \"Premier League\" },\n  { teamName: \"Sheffield United\",        postId: 120, opticoddsId: \"C65F416ACC52\",         group: \"Premier League\" },\n  { teamName: \"Southampton\",             postId: 121, opticoddsId: \"BFC3376DC331\",         group: \"Premier League\" },\n  { teamName: \"Sunderland\",              postId: 122, opticoddsId: \"7FE4D2F60890E794\",    group: \"Premier League\" },\n  { teamName: \"Tottenham Hotspur\",       postId: 123, opticoddsId: \"35DDD3D70565\",         group: \"Premier League\" },\n  { teamName: \"West Ham United\",         postId: 124, opticoddsId: \"957C00F85D81\",         group: \"Premier League\" },\n  { teamName: \"Wolverhampton Wanderers\", postId: 125, opticoddsId: \"1F74DDDE7110\",         group: \"Premier League\" }\n];\nreturn TEAMS.map(t => ({ json: t }));"
+        "jsCode": "// === EDIT YOUR API KEYS HERE — this is the only place you need to change ===\nconst CONFIG = {\n  opticoddsKey:    \"PASTE_YOUR_OPTICODDS_KEY_HERE\",\n  claudeApiKey:    \"PASTE_YOUR_CLAUDE_API_KEY_HERE\",\n  slackWebhookUrl: \"PASTE_YOUR_SLACK_WEBHOOK_URL_HERE\"\n};\n// ===========================================================================\n\nconst TEAMS = [\n  { teamName: \"AFC Bournemouth\",         postId: 101, opticoddsId: \"F2CCF38E0A5A\",         group: \"Premier League\" },\n  { teamName: \"Arsenal\",                 postId: 102, opticoddsId: \"48B92509529C\",         group: \"Premier League\" },\n  { teamName: \"Aston Villa\",             postId: 103, opticoddsId: \"C5F8130E6580\",         group: \"Premier League\" },\n  { teamName: \"Brentford\",               postId: 104, opticoddsId: \"B196AD1A3F37\",         group: \"Premier League\" },\n  { teamName: \"Brighton & Hove Albion\",  postId: 105, opticoddsId: \"263AF016D0C5\",         group: \"Premier League\" },\n  { teamName: \"Burnley\",                 postId: 106, opticoddsId: \"4B94C3B57377\",         group: \"Premier League\" },\n  { teamName: \"Chelsea\",                 postId: 107, opticoddsId: \"A477D0C02A28\",         group: \"Premier League\" },\n  { teamName: \"Crystal Palace\",          postId: 108, opticoddsId: \"E22B557B1960\",         group: \"Premier League\" },\n  { teamName: \"Everton\",                 postId: 109, opticoddsId: \"F55F77B71202\",         group: \"Premier League\" },\n  { teamName: \"Fulham\",                  postId: 110, opticoddsId: \"D6AD821C3B5E\",         group: \"Premier League\" },\n  { teamName: \"Ipswich Town\",            postId: 111, opticoddsId: \"77CBFB371ED9\",         group: \"Premier League\" },\n  { teamName: \"Leeds United\",            postId: 112, opticoddsId: \"EA3F3BDC929F604A\",    group: \"Premier League\" },\n  { teamName: \"Leicester City\",          postId: 113, opticoddsId: \"AF647EC9C595\",         group: \"Premier League\" },\n  { teamName: \"Liverpool\",               postId: 114, opticoddsId: \"F799E43513D4\",         group: \"Premier League\" },\n  { teamName: \"Luton Town\",              postId: 115, opticoddsId: \"982A5B2282B1\",         group: \"Premier League\" },\n  { teamName: \"Manchester City\",         postId: 116, opticoddsId: \"E69E55FFCF65\",         group: \"Premier League\" },\n  { teamName: \"Manchester United\",       postId: 117, opticoddsId: \"AF8DDBC0795A\",         group: \"Premier League\" },\n  { teamName: \"Newcastle United\",        postId: 118, opticoddsId: \"273700707FB1\",         group: \"Premier League\" },\n  { teamName: \"Nottingham Forest\",       postId: 119, opticoddsId: \"013D1D5F4D18\",         group: \"Premier League\" },\n  { teamName: \"Sheffield United\",        postId: 120, opticoddsId: \"C65F416ACC52\",         group: \"Premier League\" },\n  { teamName: \"Southampton\",             postId: 121, opticoddsId: \"BFC3376DC331\",         group: \"Premier League\" },\n  { teamName: \"Sunderland\",              postId: 122, opticoddsId: \"7FE4D2F60890E794\",    group: \"Premier League\" },\n  { teamName: \"Tottenham Hotspur\",       postId: 123, opticoddsId: \"35DDD3D70565\",         group: \"Premier League\" },\n  { teamName: \"West Ham United\",         postId: 124, opticoddsId: \"957C00F85D81\",         group: \"Premier League\" },\n  { teamName: \"Wolverhampton Wanderers\", postId: 125, opticoddsId: \"1F74DDDE7110\",         group: \"Premier League\" }\n];\nreturn TEAMS.map(t => ({ json: { ...t, ...CONFIG } }));"
       },
       "id": "node-022",
       "name": "Get Configured Teams",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [680, 300]
+      "position": [460, 300]
     },
     {
       "parameters": { "batchSize": 1, "options": {} },
@@ -37,7 +27,7 @@
       "name": "Loop: Split Teams",
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
-      "position": [900, 300]
+      "position": [680, 300]
     },
     {
       "parameters": {
@@ -46,7 +36,7 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "X-Api-Key", "value": "={{ $('Config').first().json.opticoddsKey }}" }
+            { "name": "X-Api-Key", "value": "={{ $json.opticoddsKey }}" }
           ]
         },
         "sendQuery": true,
@@ -64,17 +54,17 @@
       "name": "Fetch Team Results",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1120, 200]
+      "position": [900, 200]
     },
     {
       "parameters": {
-        "jsCode": "const teamInfo = $('Loop: Split Teams').first().json;\nconst fixtureResp = $input.first().json;\nconst today = DateTime.now().toFormat('yyyy-MM-dd');\nconst todayFixtures = (fixtureResp.data || []).filter(f => {\n  const startDate = f.fixture?.start_date || '';\n  return startDate.startsWith(today);\n});\nreturn [{\n  json: {\n    ...teamInfo,\n    data: todayFixtures,\n    hasMatch: todayFixtures.length > 0\n  }\n}];"
+        "jsCode": "const teamInfo = $('Loop: Split Teams').first().json;\nconst fixtureResp = $input.first().json;\nconst today = DateTime.now().toFormat('yyyy-MM-dd');\nconst todayFixtures = (fixtureResp.data || []).filter(f => {\n  const startDate = f.fixture?.start_date || f.start_date || '';\n  return startDate.startsWith(today);\n});\nreturn [{\n  json: {\n    ...teamInfo,\n    data: todayFixtures,\n    hasMatch: todayFixtures.length > 0,\n    debugCount: (fixtureResp.data || []).length,\n    debugFirstDate: (fixtureResp.data || [])[0]?.fixture?.start_date || (fixtureResp.data || [])[0]?.start_date || 'NO_DATE'\n  }\n}];"
       },
       "id": "node-024",
       "name": "Filter Today's Fixtures",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1340, 200]
+      "position": [1120, 200]
     },
     {
       "parameters": {
@@ -96,7 +86,7 @@
       "name": "Any Match Today?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [1560, 200]
+      "position": [1340, 200]
     },
     {
       "parameters": {
@@ -106,7 +96,7 @@
       "name": "Extract Match Data",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1780, 80]
+      "position": [1560, 80]
     },
     {
       "parameters": {
@@ -115,7 +105,7 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "X-Api-Key", "value": "={{ $('Config').first().json.opticoddsKey }}" }
+            { "name": "X-Api-Key", "value": "={{ $json.opticoddsKey }}" }
           ]
         },
         "sendQuery": true,
@@ -133,7 +123,7 @@
       "name": "Fetch Next Match",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2000, 80]
+      "position": [1780, 80]
     },
     {
       "parameters": {
@@ -142,7 +132,7 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "X-Api-Key", "value": "={{ $('Config').first().json.opticoddsKey }}" }
+            { "name": "X-Api-Key", "value": "={{ $('Extract Match Data').first().json.opticoddsKey }}" }
           ]
         },
         "sendQuery": true,
@@ -158,7 +148,7 @@
       "name": "Fetch Team Injuries",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2220, 80]
+      "position": [2000, 80]
     },
     {
       "parameters": {
@@ -168,7 +158,7 @@
       "name": "Build Match Context",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2440, 80]
+      "position": [2220, 80]
     },
     {
       "parameters": {
@@ -178,7 +168,7 @@
       "name": "Build Claude Prompt",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2660, 80]
+      "position": [2440, 80]
     },
     {
       "parameters": {
@@ -187,7 +177,7 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "x-api-key",         "value": "={{ $('Config').first().json.claudeApiKey }}" },
+            { "name": "x-api-key",         "value": "={{ $json.claudeApiKey }}" },
             { "name": "anthropic-version", "value": "2023-06-01" },
             { "name": "content-type",      "value": "application/json" }
           ]
@@ -201,7 +191,7 @@
       "name": "Claude API Call",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2880, 80]
+      "position": [2660, 80]
     },
     {
       "parameters": {
@@ -211,12 +201,12 @@
       "name": "Parse Claude Response",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [3100, 80]
+      "position": [2880, 80]
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $('Config').first().json.slackWebhookUrl }}",
+        "url": "={{ $json.slackWebhookUrl }}",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ $json.slackBody }}",
@@ -226,7 +216,7 @@
       "name": "Send Slack Message",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [3320, 80]
+      "position": [3100, 80]
     },
     {
       "parameters": {
@@ -236,7 +226,7 @@
       "name": "Log Success",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [3540, 80]
+      "position": [3320, 80]
     },
     {
       "parameters": {},
@@ -244,7 +234,7 @@
       "name": "Skip - No Match Today",
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
-      "position": [1780, 360]
+      "position": [1560, 360]
     },
     {
       "parameters": {},
@@ -252,13 +242,13 @@
       "name": "All Teams Processed",
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
-      "position": [900, 500]
+      "position": [680, 500]
     },
     {
       "parameters": {
-        "content": "## Setup — do this before first run\n\n### Step 1: Open the Config node\nPaste your real API keys in the **Config** node (second node, right after the trigger).\n\n- `opticoddsKey` — OpticOdds dashboard → API Keys\n- `claudeApiKey` — console.anthropic.com → API Keys\n- `slackWebhookUrl` — api.slack.com/apps → Incoming Webhooks\n\nAll three HTTP nodes reference Config automatically — no need to edit them.\n\n### Step 2: Test manually\nClick **Test workflow** on a match day. If no matches today all 25 teams skip silently — check **Filter Today's Fixtures** output to confirm it ran.\n\n### Debugging tips\n1. **Filter Today's Fixtures** — `hasMatch: true` means a fixture was found for today's date\n2. **Extract Match Data** — verify `isHome`, `goalsFor`, `goalsAgainst`\n3. **Build Match Context** — `goalScorers` will be empty (OpticOdds `events[]` is empty for soccer)\n4. Stats keys from OpticOdds: `total_scoring_att`, `ontarget_scoring_att`, `possession_percentage`, `corner_taken`",
-        "height": 380,
-        "width": 560,
+        "content": "## Setup — edit ONE node before running\n\nOpen **Get Configured Teams** and paste your real keys at the top:\n```\nopticoddsKey:    \"your-opticodds-key\"\nclaudeApiKey:    \"your-claude-key\"\nslackWebhookUrl: \"https://hooks.slack.com/...\"\n```\nThat's it — all HTTP nodes pull the keys from the team items automatically.\n\n### Debugging\nAfter a test run, click **Filter Today's Fixtures** and check:\n- `debugCount` — how many fixtures the API returned (0 = API key wrong or no history)\n- `debugFirstDate` — what the date field looks like in the response\n- `hasMatch` — whether today's date matched any fixture\n\nTo force a test with a known past match, change line 3 of **Filter Today's Fixtures**:\n```js\nconst today = '2026-04-19'; // Arsenal played this date\n```",
+        "height": 340,
+        "width": 520,
         "color": 4
       },
       "id": "node-020",
@@ -270,9 +260,6 @@
   ],
   "connections": {
     "Poll Every 30 Minutes": {
-      "main": [[{ "node": "Config", "type": "main", "index": 0 }]]
-    },
-    "Config": {
       "main": [[{ "node": "Get Configured Teams", "type": "main", "index": 0 }]]
     },
     "Get Configured Teams": {
@@ -332,5 +319,5 @@
   "staticData": null,
   "tags": [{ "name": "football" }, { "name": "premier-league" }, { "name": "slack" }, { "name": "auto-update" }],
   "triggerCount": 0,
-  "versionId": "9"
+  "versionId": "10"
 }
