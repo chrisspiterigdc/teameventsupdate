@@ -13,21 +13,13 @@
     },
     {
       "parameters": {
-        "jsCode": "// === EDIT YOUR API KEYS HERE — this is the only place you need to change ===\nconst CONFIG = {\n  opticoddsKey:    \"PASTE_YOUR_OPTICODDS_KEY_HERE\",\n  claudeApiKey:    \"PASTE_YOUR_CLAUDE_API_KEY_HERE\",\n  slackWebhookUrl: \"PASTE_YOUR_SLACK_WEBHOOK_URL_HERE\"\n};\n// ===========================================================================\n\nconst TEAMS = [\n  { teamName: \"AFC Bournemouth\",         postId: 101, opticoddsId: \"F2CCF38E0A5A\",         group: \"Premier League\" },\n  { teamName: \"Arsenal\",                 postId: 102, opticoddsId: \"48B92509529C\",         group: \"Premier League\" },\n  { teamName: \"Aston Villa\",             postId: 103, opticoddsId: \"C5F8130E6580\",         group: \"Premier League\" },\n  { teamName: \"Brentford\",               postId: 104, opticoddsId: \"B196AD1A3F37\",         group: \"Premier League\" },\n  { teamName: \"Brighton & Hove Albion\",  postId: 105, opticoddsId: \"263AF016D0C5\",         group: \"Premier League\" },\n  { teamName: \"Burnley\",                 postId: 106, opticoddsId: \"4B94C3B57377\",         group: \"Premier League\" },\n  { teamName: \"Chelsea\",                 postId: 107, opticoddsId: \"A477D0C02A28\",         group: \"Premier League\" },\n  { teamName: \"Crystal Palace\",          postId: 108, opticoddsId: \"E22B557B1960\",         group: \"Premier League\" },\n  { teamName: \"Everton\",                 postId: 109, opticoddsId: \"F55F77B71202\",         group: \"Premier League\" },\n  { teamName: \"Fulham\",                  postId: 110, opticoddsId: \"D6AD821C3B5E\",         group: \"Premier League\" },\n  { teamName: \"Ipswich Town\",            postId: 111, opticoddsId: \"77CBFB371ED9\",         group: \"Premier League\" },\n  { teamName: \"Leeds United\",            postId: 112, opticoddsId: \"EA3F3BDC929F604A\",    group: \"Premier League\" },\n  { teamName: \"Leicester City\",          postId: 113, opticoddsId: \"AF647EC9C595\",         group: \"Premier League\" },\n  { teamName: \"Liverpool\",               postId: 114, opticoddsId: \"F799E43513D4\",         group: \"Premier League\" },\n  { teamName: \"Luton Town\",              postId: 115, opticoddsId: \"982A5B2282B1\",         group: \"Premier League\" },\n  { teamName: \"Manchester City\",         postId: 116, opticoddsId: \"E69E55FFCF65\",         group: \"Premier League\" },\n  { teamName: \"Manchester United\",       postId: 117, opticoddsId: \"AF8DDBC0795A\",         group: \"Premier League\" },\n  { teamName: \"Newcastle United\",        postId: 118, opticoddsId: \"273700707FB1\",         group: \"Premier League\" },\n  { teamName: \"Nottingham Forest\",       postId: 119, opticoddsId: \"013D1D5F4D18\",         group: \"Premier League\" },\n  { teamName: \"Sheffield United\",        postId: 120, opticoddsId: \"C65F416ACC52\",         group: \"Premier League\" },\n  { teamName: \"Southampton\",             postId: 121, opticoddsId: \"BFC3376DC331\",         group: \"Premier League\" },\n  { teamName: \"Sunderland\",              postId: 122, opticoddsId: \"7FE4D2F60890E794\",    group: \"Premier League\" },\n  { teamName: \"Tottenham Hotspur\",       postId: 123, opticoddsId: \"35DDD3D70565\",         group: \"Premier League\" },\n  { teamName: \"West Ham United\",         postId: 124, opticoddsId: \"957C00F85D81\",         group: \"Premier League\" },\n  { teamName: \"Wolverhampton Wanderers\", postId: 125, opticoddsId: \"1F74DDDE7110\",         group: \"Premier League\" }\n];\nreturn TEAMS.map(t => ({ json: { ...t, ...CONFIG } }));"
+        "jsCode": "// === EDIT YOUR API KEYS HERE — only place you need to change ===\nconst CONFIG = {\n  opticoddsKey:    \"PASTE_YOUR_OPTICODDS_KEY_HERE\",\n  claudeApiKey:    \"PASTE_YOUR_CLAUDE_API_KEY_HERE\",\n  slackWebhookUrl: \"PASTE_YOUR_SLACK_WEBHOOK_URL_HERE\"\n};\n// =================================================================\n\nconst TEAMS = [\n  { teamName: \"AFC Bournemouth\",         postId: 101, opticoddsId: \"F2CCF38E0A5A\",         group: \"Premier League\" },\n  { teamName: \"Arsenal\",                 postId: 102, opticoddsId: \"48B92509529C\",         group: \"Premier League\" },\n  { teamName: \"Aston Villa\",             postId: 103, opticoddsId: \"C5F8130E6580\",         group: \"Premier League\" },\n  { teamName: \"Brentford\",               postId: 104, opticoddsId: \"B196AD1A3F37\",         group: \"Premier League\" },\n  { teamName: \"Brighton & Hove Albion\",  postId: 105, opticoddsId: \"263AF016D0C5\",         group: \"Premier League\" },\n  { teamName: \"Burnley\",                 postId: 106, opticoddsId: \"4B94C3B57377\",         group: \"Premier League\" },\n  { teamName: \"Chelsea\",                 postId: 107, opticoddsId: \"A477D0C02A28\",         group: \"Premier League\" },\n  { teamName: \"Crystal Palace\",          postId: 108, opticoddsId: \"E22B557B1960\",         group: \"Premier League\" },\n  { teamName: \"Everton\",                 postId: 109, opticoddsId: \"F55F77B71202\",         group: \"Premier League\" },\n  { teamName: \"Fulham\",                  postId: 110, opticoddsId: \"D6AD821C3B5E\",         group: \"Premier League\" },\n  { teamName: \"Ipswich Town\",            postId: 111, opticoddsId: \"77CBFB371ED9\",         group: \"Premier League\" },\n  { teamName: \"Leeds United\",            postId: 112, opticoddsId: \"EA3F3BDC929F604A\",    group: \"Premier League\" },\n  { teamName: \"Leicester City\",          postId: 113, opticoddsId: \"AF647EC9C595\",         group: \"Premier League\" },\n  { teamName: \"Liverpool\",               postId: 114, opticoddsId: \"F799E43513D4\",         group: \"Premier League\" },\n  { teamName: \"Luton Town\",              postId: 115, opticoddsId: \"982A5B2282B1\",         group: \"Premier League\" },\n  { teamName: \"Manchester City\",         postId: 116, opticoddsId: \"E69E55FFCF65\",         group: \"Premier League\" },\n  { teamName: \"Manchester United\",       postId: 117, opticoddsId: \"AF8DDBC0795A\",         group: \"Premier League\" },\n  { teamName: \"Newcastle United\",        postId: 118, opticoddsId: \"273700707FB1\",         group: \"Premier League\" },\n  { teamName: \"Nottingham Forest\",       postId: 119, opticoddsId: \"013D1D5F4D18\",         group: \"Premier League\" },\n  { teamName: \"Sheffield United\",        postId: 120, opticoddsId: \"C65F416ACC52\",         group: \"Premier League\" },\n  { teamName: \"Southampton\",             postId: 121, opticoddsId: \"BFC3376DC331\",         group: \"Premier League\" },\n  { teamName: \"Sunderland\",              postId: 122, opticoddsId: \"7FE4D2F60890E794\",    group: \"Premier League\" },\n  { teamName: \"Tottenham Hotspur\",       postId: 123, opticoddsId: \"35DDD3D70565\",         group: \"Premier League\" },\n  { teamName: \"West Ham United\",         postId: 124, opticoddsId: \"957C00F85D81\",         group: \"Premier League\" },\n  { teamName: \"Wolverhampton Wanderers\", postId: 125, opticoddsId: \"1F74DDDE7110\",         group: \"Premier League\" }\n];\nreturn TEAMS.map(t => ({ json: { ...t, ...CONFIG } }));"
       },
       "id": "node-022",
       "name": "Get Configured Teams",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [460, 300]
-    },
-    {
-      "parameters": { "batchSize": 1, "options": {} },
-      "id": "node-005",
-      "name": "Loop: Split Teams",
-      "type": "n8n-nodes-base.splitInBatches",
-      "typeVersion": 3,
-      "position": [680, 300]
     },
     {
       "parameters": {
@@ -48,23 +40,25 @@
             { "name": "end_date",   "value": "={{ DateTime.now().toFormat('yyyy-MM-dd') }}" }
           ]
         },
-        "options": {}
+        "options": {
+          "includeInputDataInOutput": true
+        }
       },
       "id": "node-002",
       "name": "Fetch Team Results",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [900, 200]
+      "position": [680, 300]
     },
     {
       "parameters": {
-        "jsCode": "const teamInfo = $('Loop: Split Teams').first().json;\nconst fixtureResp = $input.first().json;\nconst today = DateTime.now().toFormat('yyyy-MM-dd');\nconst todayFixtures = (fixtureResp.data || []).filter(f => {\n  const startDate = f.fixture?.start_date || f.start_date || '';\n  return startDate.startsWith(today);\n});\nreturn [{\n  json: {\n    ...teamInfo,\n    data: todayFixtures,\n    hasMatch: todayFixtures.length > 0,\n    debugCount: (fixtureResp.data || []).length,\n    debugFirstDate: (fixtureResp.data || [])[0]?.fixture?.start_date || (fixtureResp.data || [])[0]?.start_date || 'NO_DATE'\n  }\n}];"
+        "jsCode": "const today = DateTime.now().toFormat('yyyy-MM-dd');\nreturn $input.all().map(item => {\n  const i = item.json;\n  const allFixtures = i.data || [];\n  const todayFixtures = allFixtures.filter(f => {\n    const d = f.fixture?.start_date || f.start_date || '';\n    return d.startsWith(today);\n  });\n  return {\n    json: {\n      ...i,\n      data: todayFixtures,\n      hasMatch: todayFixtures.length > 0,\n      debugCount: allFixtures.length,\n      debugFirstDate: allFixtures[0]?.fixture?.start_date || allFixtures[0]?.start_date || 'NO_DATE'\n    }\n  };\n});"
       },
       "id": "node-024",
       "name": "Filter Today's Fixtures",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1120, 200]
+      "position": [900, 300]
     },
     {
       "parameters": {
@@ -86,17 +80,17 @@
       "name": "Any Match Today?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [1340, 200]
+      "position": [1120, 300]
     },
     {
       "parameters": {
-        "jsCode": "const teamInfo = $input.first().json;\nconst fixture = (teamInfo.data || [])[0];\nif (!fixture) return [{ json: { ...teamInfo, skip: true } }];\nconst f = fixture.fixture || {};\nconst homeId = f.home_competitors?.[0]?.id;\nconst isHome = homeId === teamInfo.opticoddsId;\nconst homeScore = fixture.scores?.home?.total ?? 0;\nconst awayScore = fixture.scores?.away?.total ?? 0;\nconst goalsFor     = isHome ? homeScore : awayScore;\nconst goalsAgainst = isHome ? awayScore : homeScore;\nconst opponentName = isHome\n  ? (f.away_team_display || f.away_competitors?.[0]?.name || 'Unknown')\n  : (f.home_team_display || f.home_competitors?.[0]?.name || 'Unknown');\nconst opponentId = isHome ? f.away_competitors?.[0]?.id : f.home_competitors?.[0]?.id;\nconst events   = fixture.events || [];\nconst myStats  = ((isHome ? fixture.stats?.home : fixture.stats?.away) || []).find(s => s.period === 'all')?.stats || {};\nconst oppStats = ((isHome ? fixture.stats?.away : fixture.stats?.home) || []).find(s => s.period === 'all')?.stats || {};\nconst competition = fixture.league?.name || fixture.league?.id || '';\nreturn [{ json: { ...teamInfo, teamId: teamInfo.opticoddsId, opponentName, opponentId, isHome, goalsFor, goalsAgainst, matchId: f.id, matchDate: f.start_date, competition, events, myStats, oppStats } }];"
+        "jsCode": "return $input.all().map(item => {\n  const { data: fixturesData, debugCount, debugFirstDate, hasMatch, ...teamInfo } = item.json;\n  const fixture = (fixturesData || [])[0];\n  if (!fixture) return { json: { ...teamInfo, skip: true } };\n  const f = fixture.fixture || {};\n  const homeId = f.home_competitors?.[0]?.id;\n  const isHome = homeId === teamInfo.opticoddsId;\n  const homeScore = fixture.scores?.home?.total ?? 0;\n  const awayScore = fixture.scores?.away?.total ?? 0;\n  const goalsFor     = isHome ? homeScore : awayScore;\n  const goalsAgainst = isHome ? awayScore : homeScore;\n  const opponentName = isHome\n    ? (f.away_team_display || f.away_competitors?.[0]?.name || 'Unknown')\n    : (f.home_team_display || f.home_competitors?.[0]?.name || 'Unknown');\n  const opponentId = isHome ? f.away_competitors?.[0]?.id : f.home_competitors?.[0]?.id;\n  const events   = fixture.events || [];\n  const myStats  = ((isHome ? fixture.stats?.home : fixture.stats?.away) || []).find(s => s.period === 'all')?.stats || {};\n  const oppStats = ((isHome ? fixture.stats?.away : fixture.stats?.home) || []).find(s => s.period === 'all')?.stats || {};\n  const competition = fixture.league?.name || fixture.league?.id || '';\n  return {\n    json: {\n      ...teamInfo,\n      teamId: teamInfo.opticoddsId,\n      opponentName, opponentId, isHome,\n      goalsFor, goalsAgainst,\n      matchId: f.id, matchDate: f.start_date,\n      competition, events, myStats, oppStats\n    }\n  };\n});"
       },
       "id": "node-004",
       "name": "Extract Match Data",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1560, 80]
+      "position": [1340, 300]
     },
     {
       "parameters": {
@@ -117,13 +111,25 @@
             { "name": "limit",      "value": "1" }
           ]
         },
-        "options": {}
+        "options": {
+          "includeInputDataInOutput": true
+        }
       },
       "id": "node-008",
       "name": "Fetch Next Match",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1780, 80]
+      "position": [1560, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map(item => {\n  const { data: nextFixturesRaw, ...matchData } = item.json;\n  const nextFixtures = nextFixturesRaw || [];\n  let nextOpponent = 'TBD', nextMatchDate = null, nextCompetition = 'TBD';\n  if (nextFixtures[0]) {\n    const nf = nextFixtures[0].fixture || {};\n    const homeId = nf.home_competitors?.[0]?.id;\n    const isHome = homeId === matchData.teamId;\n    nextOpponent = isHome\n      ? (nf.away_team_display || nf.away_competitors?.[0]?.name || 'TBD')\n      : (nf.home_team_display || nf.home_competitors?.[0]?.name || 'TBD');\n    nextMatchDate = nf.start_date;\n    nextCompetition = nextFixtures[0].league?.name || 'TBD';\n  }\n  return { json: { ...matchData, nextOpponent, nextMatchDate, nextCompetition } };\n});"
+      },
+      "id": "node-025",
+      "name": "Process Next Match",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1780, 300]
     },
     {
       "parameters": {
@@ -132,43 +138,45 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "X-Api-Key", "value": "={{ $('Extract Match Data').first().json.opticoddsKey }}" }
+            { "name": "X-Api-Key", "value": "={{ $json.opticoddsKey }}" }
           ]
         },
         "sendQuery": true,
         "queryParameters": {
           "parameters": [
             { "name": "sport",   "value": "soccer" },
-            { "name": "team_id", "value": "={{ $('Extract Match Data').first().json.teamId }}" }
+            { "name": "team_id", "value": "={{ $json.teamId }}" }
           ]
         },
-        "options": {}
+        "options": {
+          "includeInputDataInOutput": true
+        }
       },
       "id": "node-021",
       "name": "Fetch Team Injuries",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2000, 80]
+      "position": [2000, 300]
     },
     {
       "parameters": {
-        "jsCode": "const teamData = $('Extract Match Data').first().json;\nconst nextMatchResp = $('Fetch Next Match').first().json;\nconst injuriesResp = $input.first().json;\n\nconst nextFixtures = nextMatchResp.data || [];\nconst nextFixture = nextFixtures[0] || null;\nlet nextOpponent = 'TBD', nextMatchDate = null, nextCompetition = 'TBD';\nif (nextFixture) {\n  const nf = nextFixture.fixture || {};\n  const homeId = nf.home_competitors?.[0]?.id;\n  const isHome = homeId === teamData.teamId;\n  nextOpponent = isHome\n    ? (nf.away_team_display || nf.away_competitors?.[0]?.name || 'TBD')\n    : (nf.home_team_display || nf.home_competitors?.[0]?.name || 'TBD');\n  nextMatchDate = nf.start_date;\n  nextCompetition = nextFixture.league?.name || 'TBD';\n}\n\nconst injuries = (injuriesResp.data || [])\n  .filter(inj => inj.player?.name)\n  .slice(0, 5)\n  .map(inj => ({ name: inj.player.name, position: inj.player.position || '', status: inj.status, type: inj.type }));\n\nconst goalEvents = (teamData.events || []).filter(e => {\n  const t = (e.type || e.event_type || '').toLowerCase();\n  return t.includes('goal') && (e.team_id === teamData.teamId || e.competitor_id === teamData.teamId);\n});\nconst goalScorers = goalEvents.map(e => e.player_name || e.player?.name).filter(Boolean);\n\nconst { goalsFor, goalsAgainst } = teamData;\nconst result = goalsFor > goalsAgainst ? 'WIN' : goalsFor < goalsAgainst ? 'LOSS' : 'DRAW';\nreturn [{ json: { ...teamData, result, nextOpponent, nextMatchDate, nextCompetition, injuries, goalScorers } }];"
+        "jsCode": "return $input.all().map(item => {\n  const { data: injuriesRaw, ...d } = item.json;\n  const injuries = (injuriesRaw || [])\n    .filter(inj => inj.player?.name)\n    .slice(0, 5)\n    .map(inj => ({ name: inj.player.name, position: inj.player.position || '', status: inj.status, type: inj.type }));\n  const goalEvents = (d.events || []).filter(e => {\n    const t = (e.type || e.event_type || '').toLowerCase();\n    return t.includes('goal') && (e.team_id === d.teamId || e.competitor_id === d.teamId);\n  });\n  const goalScorers = goalEvents.map(e => e.player_name || e.player?.name).filter(Boolean);\n  const result = d.goalsFor > d.goalsAgainst ? 'WIN' : d.goalsFor < d.goalsAgainst ? 'LOSS' : 'DRAW';\n  return { json: { ...d, result, injuries, goalScorers } };\n});"
       },
       "id": "node-009",
       "name": "Build Match Context",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2220, 80]
+      "position": [2220, 300]
     },
     {
       "parameters": {
-        "jsCode": "const d = $input.first().json;\nlet nextFixtureText = 'No upcoming match currently scheduled.';\nif (d.nextMatchDate) {\n  const dt = new Date(d.nextMatchDate);\n  const formatted = dt.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });\n  nextFixtureText = 'Next: ' + d.nextOpponent + ' (' + d.nextCompetition + ') - ' + formatted;\n}\nconst lines = [\n  'Update the website for ' + d.teamName + '.',\n  '',\n  'MATCH:',\n  '- ' + d.competition + ' | ' + (d.isHome ? 'Home' : 'Away') + ' vs ' + d.opponentName,\n  '- Result: ' + d.result + ' ' + d.goalsFor + '-' + d.goalsAgainst\n];\nif (d.goalScorers && d.goalScorers.length > 0) {\n  lines.push('- Goals: ' + d.goalScorers.join(', '));\n}\nif (d.myStats && Object.keys(d.myStats).length > 0) {\n  const s = d.myStats;\n  const parts = [];\n  const shots = s.total_scoring_att ?? s.shots;\n  const onTarget = s.ontarget_scoring_att ?? s.shots_on_target;\n  if (shots !== undefined) parts.push('Shots ' + shots + (onTarget !== undefined ? ' (' + onTarget + ' on target)' : ''));\n  const poss = s.possession_percentage ?? s.possession;\n  if (poss !== undefined) parts.push('Possession ' + poss + '%');\n  const corners = s.corner_taken ?? s.corners;\n  if (corners !== undefined) parts.push('Corners ' + corners);\n  if (parts.length > 0) lines.push('- Stats: ' + parts.join(' | '));\n}\nlines.push('', 'NEXT MATCH: ' + nextFixtureText);\nif (d.injuries && d.injuries.length > 0) {\n  lines.push('', 'INJURY LIST:');\n  d.injuries.forEach(inj => {\n    lines.push('- ' + inj.name + (inj.position ? ' (' + inj.position + ')' : '') + ': ' + inj.status + ' - ' + inj.type);\n  });\n}\nlines.push('', \"Write a punchy, supporter-facing 2-3 sentence update for the team's website. Requirements:\", '1. Open with the result and score - mention the scorer(s) if available', '2. Include a performance detail from the stats if provided', '3. Close with the next fixture', '4. If there are injuries, weave in one concern naturally', '', 'Return ONLY plain text - no HTML, no markdown, no quotes.');\nconst prompt = lines.join('\\n');\nconst claudeBody = { model: 'claude-sonnet-4-6', max_tokens: 300, messages: [{ role: 'user', content: prompt }] };\nreturn [{ json: { ...d, prompt, claudeBody } }];"
+        "jsCode": "return $input.all().map(item => {\n  const d = item.json;\n  let nextFixtureText = 'No upcoming match currently scheduled.';\n  if (d.nextMatchDate) {\n    const dt = new Date(d.nextMatchDate);\n    const formatted = dt.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });\n    nextFixtureText = 'Next: ' + d.nextOpponent + ' (' + d.nextCompetition + ') - ' + formatted;\n  }\n  const lines = [\n    'Update the website for ' + d.teamName + '.',\n    '',\n    'MATCH:',\n    '- ' + d.competition + ' | ' + (d.isHome ? 'Home' : 'Away') + ' vs ' + d.opponentName,\n    '- Result: ' + d.result + ' ' + d.goalsFor + '-' + d.goalsAgainst\n  ];\n  if (d.goalScorers && d.goalScorers.length > 0) lines.push('- Goals: ' + d.goalScorers.join(', '));\n  if (d.myStats && Object.keys(d.myStats).length > 0) {\n    const s = d.myStats;\n    const parts = [];\n    const shots = s.total_scoring_att ?? s.shots;\n    const onTarget = s.ontarget_scoring_att ?? s.shots_on_target;\n    if (shots !== undefined) parts.push('Shots ' + shots + (onTarget !== undefined ? ' (' + onTarget + ' on target)' : ''));\n    const poss = s.possession_percentage ?? s.possession;\n    if (poss !== undefined) parts.push('Possession ' + poss + '%');\n    const corners = s.corner_taken ?? s.corners;\n    if (corners !== undefined) parts.push('Corners ' + corners);\n    if (parts.length > 0) lines.push('- Stats: ' + parts.join(' | '));\n  }\n  lines.push('', 'NEXT MATCH: ' + nextFixtureText);\n  if (d.injuries && d.injuries.length > 0) {\n    lines.push('', 'INJURY LIST:');\n    d.injuries.forEach(inj => lines.push('- ' + inj.name + (inj.position ? ' (' + inj.position + ')' : '') + ': ' + inj.status + ' - ' + inj.type));\n  }\n  lines.push('', \"Write a punchy, supporter-facing 2-3 sentence update for the team's website. Requirements:\", '1. Open with the result and score - mention the scorer(s) if available', '2. Include a performance detail from the stats if provided', '3. Close with the next fixture', '4. If there are injuries, weave in one concern naturally', '', 'Return ONLY plain text - no HTML, no markdown, no quotes.');\n  const prompt = lines.join('\\n');\n  const claudeBody = { model: 'claude-sonnet-4-6', max_tokens: 300, messages: [{ role: 'user', content: prompt }] };\n  return { json: { ...d, prompt, claudeBody } };\n});"
       },
       "id": "node-010",
       "name": "Build Claude Prompt",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2440, 80]
+      "position": [2440, 300]
     },
     {
       "parameters": {
@@ -185,23 +193,25 @@
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ $json.claudeBody }}",
-        "options": {}
+        "options": {
+          "includeInputDataInOutput": true
+        }
       },
       "id": "node-011",
       "name": "Claude API Call",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2660, 80]
+      "position": [2660, 300]
     },
     {
       "parameters": {
-        "jsCode": "const claudeResp = $input.first().json;\nconst promptData = $('Build Claude Prompt').first().json;\nconst generatedContent = claudeResp.content?.[0]?.text?.trim() || '';\nif (!generatedContent) {\n  throw new Error('Claude returned empty content for ' + promptData.teamName);\n}\nconst resultEmoji = promptData.result === 'WIN' ? ':white_check_mark:' : promptData.result === 'LOSS' ? ':x:' : ':heavy_minus_sign:';\nconst scoreText = promptData.goalsFor + '-' + promptData.goalsAgainst;\nconst scorerLine = promptData.goalScorers?.length > 0 ? 'Goals: ' + promptData.goalScorers.join(', ') : null;\nconst contextParts = [promptData.competition || 'Premier League'];\nif (promptData.nextOpponent !== 'TBD') contextParts.push('Next: ' + promptData.nextOpponent + ' (' + promptData.nextCompetition + ')');\nif (promptData.injuries?.length > 0) contextParts.push('Injuries: ' + promptData.injuries.length);\nconst slackBody = {\n  text: promptData.teamName + ' | ' + promptData.result + ' ' + scoreText + ' vs ' + promptData.opponentName,\n  blocks: [\n    { type: 'header', text: { type: 'plain_text', text: promptData.teamName + '  |  ' + promptData.result + ' ' + scoreText, emoji: true } },\n    { type: 'section', text: { type: 'mrkdwn', text: resultEmoji + '  *vs ' + promptData.opponentName + '*  (' + (promptData.competition || 'Premier League') + ')' + (scorerLine ? '\\n' + scorerLine : '') + '\\n\\n' + generatedContent } },\n    { type: 'context', elements: [{ type: 'mrkdwn', text: contextParts.join('  |  ') }] }\n  ]\n};\nreturn [{ json: { ...promptData, generatedContent, slackBody } }];"
+        "jsCode": "return $input.all().map(item => {\n  const d = item.json;\n  const generatedContent = (d.content || [])[0]?.text?.trim() || '';\n  if (!generatedContent) throw new Error('Claude returned empty content for ' + d.teamName);\n  const resultEmoji = d.result === 'WIN' ? ':white_check_mark:' : d.result === 'LOSS' ? ':x:' : ':heavy_minus_sign:';\n  const scoreText = d.goalsFor + '-' + d.goalsAgainst;\n  const scorerLine = d.goalScorers?.length > 0 ? 'Goals: ' + d.goalScorers.join(', ') : null;\n  const contextParts = [d.competition || 'Premier League'];\n  if (d.nextOpponent !== 'TBD') contextParts.push('Next: ' + d.nextOpponent + ' (' + d.nextCompetition + ')');\n  if (d.injuries?.length > 0) contextParts.push('Injuries: ' + d.injuries.length);\n  const slackBody = {\n    text: d.teamName + ' | ' + d.result + ' ' + scoreText + ' vs ' + d.opponentName,\n    blocks: [\n      { type: 'header', text: { type: 'plain_text', text: d.teamName + '  |  ' + d.result + ' ' + scoreText, emoji: true } },\n      { type: 'section', text: { type: 'mrkdwn', text: resultEmoji + '  *vs ' + d.opponentName + '*  (' + (d.competition || 'Premier League') + ')' + (scorerLine ? '\\n' + scorerLine : '') + '\\n\\n' + generatedContent } },\n      { type: 'context', elements: [{ type: 'mrkdwn', text: contextParts.join('  |  ') }] }\n    ]\n  };\n  return { json: { ...d, generatedContent, slackBody } };\n});"
       },
       "id": "node-012",
       "name": "Parse Claude Response",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2880, 80]
+      "position": [2880, 300]
     },
     {
       "parameters": {
@@ -216,39 +226,23 @@
       "name": "Send Slack Message",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [3100, 80]
+      "position": [3100, 300]
     },
     {
       "parameters": {
-        "jsCode": "const d = $('Parse Claude Response').first().json;\nconst ts = new Date().toISOString();\nconsole.log('[' + ts + '] OK | ' + d.teamName + ' | Slack sent | ' + d.result + ' ' + d.goalsFor + '-' + d.goalsAgainst + ' vs ' + d.opponentName);\nreturn [{ json: { success: true, timestamp: ts, team: d.teamName, result: d.result + ' ' + d.goalsFor + '-' + d.goalsAgainst, opponent: d.opponentName, competition: d.competition, goalScorers: d.goalScorers, injuries: (d.injuries || []).length } }];"
+        "jsCode": "return $input.all().map(item => {\n  const d = item.json;\n  const ts = new Date().toISOString();\n  console.log('[' + ts + '] OK | ' + d.teamName + ' | ' + d.result + ' ' + d.goalsFor + '-' + d.goalsAgainst + ' vs ' + d.opponentName);\n  return { json: { success: true, timestamp: ts, team: d.teamName, result: d.result + ' ' + d.goalsFor + '-' + d.goalsAgainst, opponent: d.opponentName, competition: d.competition } };\n});"
       },
       "id": "node-016",
       "name": "Log Success",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [3320, 80]
-    },
-    {
-      "parameters": {},
-      "id": "node-017",
-      "name": "Skip - No Match Today",
-      "type": "n8n-nodes-base.noOp",
-      "typeVersion": 1,
-      "position": [1560, 360]
-    },
-    {
-      "parameters": {},
-      "id": "node-018",
-      "name": "All Teams Processed",
-      "type": "n8n-nodes-base.noOp",
-      "typeVersion": 1,
-      "position": [680, 500]
+      "position": [3320, 300]
     },
     {
       "parameters": {
-        "content": "## Setup — edit ONE node before running\n\nOpen **Get Configured Teams** and paste your real keys at the top:\n```\nopticoddsKey:    \"your-opticodds-key\"\nclaudeApiKey:    \"your-claude-key\"\nslackWebhookUrl: \"https://hooks.slack.com/...\"\n```\nThat's it — all HTTP nodes pull the keys from the team items automatically.\n\n### Debugging\nAfter a test run, click **Filter Today's Fixtures** and check:\n- `debugCount` — how many fixtures the API returned (0 = API key wrong or no history)\n- `debugFirstDate` — what the date field looks like in the response\n- `hasMatch` — whether today's date matched any fixture\n\nTo force a test with a known past match, change line 3 of **Filter Today's Fixtures**:\n```js\nconst today = '2026-04-19'; // Arsenal played this date\n```",
-        "height": 340,
-        "width": 520,
+        "content": "## How this workflow runs\n\nNo loop — all 25 teams flow through every node in one pass:\n1. **Get Configured Teams** emits 25 items (one per team)\n2. **Fetch Team Results** makes 25 API calls in sequence, merges team info into each response\n3. **Filter Today's Fixtures** keeps only matches from today\n4. **Any Match Today?** drops teams with no match — only matched teams continue\n5. Remaining teams go through Next Match → Injuries → Claude → Slack\n\n## Setup\nOpen **Get Configured Teams** and fill in the CONFIG block at the top:\n```\nopticoddsKey:    \"your-opticodds-key\"\nclaudeApiKey:    \"your-claude-key\"\nslackWebhookUrl: \"https://hooks.slack.com/...\"\n```\n\n## Debugging — click Filter Today's Fixtures after a test run\n- `debugCount` — fixtures returned by API (0 = API key wrong)\n- `debugFirstDate` — date format from OpticOdds (should start with yyyy-MM-dd)\n- `hasMatch` — whether today matched\n\nTo test with a known past match, change line 1 of **Filter Today's Fixtures**:\n```js\nconst today = '2026-04-19'; // Arsenal played this date\n```",
+        "height": 400,
+        "width": 560,
         "color": 4
       },
       "id": "node-020",
@@ -263,13 +257,7 @@
       "main": [[{ "node": "Get Configured Teams", "type": "main", "index": 0 }]]
     },
     "Get Configured Teams": {
-      "main": [[{ "node": "Loop: Split Teams", "type": "main", "index": 0 }]]
-    },
-    "Loop: Split Teams": {
-      "main": [
-        [{ "node": "Fetch Team Results",  "type": "main", "index": 0 }],
-        [{ "node": "All Teams Processed", "type": "main", "index": 0 }]
-      ]
+      "main": [[{ "node": "Fetch Team Results", "type": "main", "index": 0 }]]
     },
     "Fetch Team Results": {
       "main": [[{ "node": "Filter Today's Fixtures", "type": "main", "index": 0 }]]
@@ -279,17 +267,16 @@
     },
     "Any Match Today?": {
       "main": [
-        [{ "node": "Extract Match Data",    "type": "main", "index": 0 }],
-        [{ "node": "Skip - No Match Today", "type": "main", "index": 0 }]
+        [{ "node": "Extract Match Data", "type": "main", "index": 0 }]
       ]
     },
     "Extract Match Data": {
       "main": [[{ "node": "Fetch Next Match", "type": "main", "index": 0 }]]
     },
-    "Skip - No Match Today": {
-      "main": [[{ "node": "Loop: Split Teams", "type": "main", "index": 0 }]]
-    },
     "Fetch Next Match": {
+      "main": [[{ "node": "Process Next Match", "type": "main", "index": 0 }]]
+    },
+    "Process Next Match": {
       "main": [[{ "node": "Fetch Team Injuries", "type": "main", "index": 0 }]]
     },
     "Fetch Team Injuries": {
@@ -309,9 +296,6 @@
     },
     "Send Slack Message": {
       "main": [[{ "node": "Log Success", "type": "main", "index": 0 }]]
-    },
-    "Log Success": {
-      "main": [[{ "node": "Loop: Split Teams", "type": "main", "index": 0 }]]
     }
   },
   "pinData": {},
@@ -319,5 +303,5 @@
   "staticData": null,
   "tags": [{ "name": "football" }, { "name": "premier-league" }, { "name": "slack" }, { "name": "auto-update" }],
   "triggerCount": 0,
-  "versionId": "10"
+  "versionId": "11"
 }
