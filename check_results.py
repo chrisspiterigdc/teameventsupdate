@@ -67,44 +67,22 @@ def fetch_todays_matches(today: str) -> list:
 
 
 def _mock_matches(today: str) -> list:
-    """Plausible fixtures for a mid-April matchday."""
-    return [
-        {
-            "homeTeam": {"name": "Arsenal"},
-            "awayTeam": {"name": "Chelsea"},
-            "score": {"fullTime": {"home": 2, "away": 1}, "halfTime": {"home": 1, "away": 0}},
-            "status": "FINISHED",
-            "utcDate": f"{today}T15:00:00Z",
-        },
-        {
-            "homeTeam": {"name": "Liverpool"},
-            "awayTeam": {"name": "Manchester City"},
-            "score": {"fullTime": {"home": 3, "away": 2}, "halfTime": {"home": 1, "away": 1}},
-            "status": "FINISHED",
-            "utcDate": f"{today}T17:30:00Z",
-        },
-        {
-            "homeTeam": {"name": "Tottenham Hotspur"},
-            "awayTeam": {"name": "Manchester United"},
-            "score": {"fullTime": {"home": 1, "away": 1}, "halfTime": {"home": 0, "away": 1}},
-            "status": "FINISHED",
-            "utcDate": f"{today}T15:00:00Z",
-        },
-        {
-            "homeTeam": {"name": "Aston Villa"},
-            "awayTeam": {"name": "Newcastle United"},
-            "score": {"fullTime": {"home": 0, "away": 2}, "halfTime": {"home": 0, "away": 1}},
-            "status": "FINISHED",
-            "utcDate": f"{today}T15:00:00Z",
-        },
-        {
-            "homeTeam": {"name": "Everton"},
-            "awayTeam": {"name": "West Ham United"},
-            "score": {"fullTime": {"home": 2, "away": 0}, "halfTime": {"home": 1, "away": 0}},
-            "status": "FINISHED",
-            "utcDate": f"{today}T15:00:00Z",
-        },
-    ]
+    """Known real results keyed by date; empty list for unknown dates."""
+    known = {
+        "2026-04-21": [
+            {
+                "homeTeam": {"name": "Brighton & Hove Albion"},
+                "awayTeam": {"name": "Chelsea"},
+                "score": {"fullTime": {"home": 3, "away": 0}, "halfTime": {"home": 1, "away": 0}},
+                "status": "FINISHED",
+                "utcDate": f"{today}T15:00:00Z",
+            },
+        ],
+    }
+    matches = known.get(today, [])
+    if not matches:
+        print(f"No known mock data for {today} — no matches returned.\n")
+    return matches
 
 
 def generate_supporter_summary(team: str, match: dict, client: anthropic.Anthropic) -> str:
