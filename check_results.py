@@ -49,23 +49,107 @@ def canonical(name: str) -> str:
     return TEAM_ALIASES.get(name, name)
 
 
-def fetch_todays_matches(today: str) -> list:
-    """Return finished Premier League matches for today from football-data.org or mock data."""
-    if not FOOTBALL_DATA_API_KEY:
-        print("FOOTBALL_DATA_API_KEY not set - using mock match data.\n")
-        return _mock_matches(today)
+FLASHSCORE_RESULTS_URL = "https://www.flashscore.com/football/england/premier-league/results/"
+BBC_PL_URL = "https://www.bbc.co.uk/sport/football/premier-league/scores-fixtures"
+USER_AGENT = "Mozilla/5.0 (compatible; teameventsupdate/1.0)"
 
-    url = (
-        "https://api.football-data.org/v4/competitions/PL/matches"
-        f"?dateFrom={today}&dateTo={today}&status=FINISHED"
-    )
+
+def fetch_flashscore_results(target_date: str) -> list:
+    """Return finished Premier League matches for `target_date` from Flashscore.
+
+    Flashscore is the canonical source for scores, half-time scores, scorers and
+    minutes. It does not expose a public API, and its results page is rendered
+    client-side, so a production run needs either a headless browser (Playwright,
+    Selenium) or the undocumented mobile endpoint. This stub fetches the static
+    HTML only and returns [] unless a parser is plugged in.
+    """
     try:
-        resp = requests.get(url, headers={"X-Auth-Token": FOOTBALL_DATA_API_KEY}, timeout=10)
+        resp = requests.get(
+            FLASHSCORE_RESULTS_URL,
+            headers={"User-Agent": USER_AGENT, "Accept-Language": "en-GB"},
+            timeout=5,
+        )
         resp.raise_for_status()
-        return resp.json().get("matches", [])
+        # TODO: plug in headless-browser / mobile-API parser that emits
+        # dicts in the shape produced by _mock_matches().
+        return []
     except requests.RequestException as exc:
-        print(f"Football API error ({exc}) - falling back to mock data.\n")
-        return _mock_matches(today)
+        print(f"Flashscore fetch failed ({exc})")
+        return []
+
+
+def fetch_bbc_match_details(home: str, away: str, target_date: str) -> str:
+    """Return post-match narrative detail from BBC Sport for the given fixture.
+
+    BBC Sport is used to enrich each match with manager reaction, tactical
+    notes, notable runs and historical context. BBC has no public scores API;
+    production use needs to scrape the daily scores/fixtures index to find the
+    match report URL, then parse the article. This stub returns '' and the
+    caller falls back to the mock `context` already attached to each match.
+    """
+    try:
+        resp = requests.get(
+            f"{BBC_PL_URL}/{target_date[:7]}",
+            headers={"User-Agent": USER_AGENT, "Accept-Language": "en-GB"},
+            timeout=5,
+        )
+        resp.raise_for_status()
+        # TODO: locate the match report link for `home` vs `away` on
+        # `target_date`, fetch it, and extract the key narrative paragraphs.
+        return ""
+    except requests.RequestException as exc:
+        print(f"BBC fetch failed ({exc})")
+        return ""
+
+
+def fetch_todays_matches(today: str) -> list:
+    """Return finished Premier League matches for `today`.
+
+    Source priority:
+      1. Flashscore (scores, scorers, timings) - canonical.
+      2. football-data.org v4 (if FOOTBALL_DATA_API_KEY set) - structured fallback.
+      3. Mock data keyed by date - last-resort offline fallback.
+
+    Each returned match may be enriched with a `context` dict keyed by team,
+    sourced from BBC Sport match reports and league-table state.
+    """
+    matches = fetch_flashscore_results(today)
+    if matches:
+        print("Using Flashscore as results source.\n")
+        return _enrich_with_bbc(matches, today)
+
+    if FOOTBALL_DATA_API_KEY:
+        url = (
+            "https://api.football-data.org/v4/competitions/PL/matches"
+            f"?dateFrom={today}&dateTo={today}&status=FINISHED"
+        )
+        try:
+            resp = requests.get(url, headers={"X-Auth-Token": FOOTBALL_DATA_API_KEY}, timeout=10)
+            resp.raise_for_status()
+            matches = resp.json().get("matches", [])
+            if matches:
+                print("Using football-data.org as results source.\n")
+                return _enrich_with_bbc(matches, today)
+        except requests.RequestException as exc:
+            print(f"Football API error ({exc}) - falling back to mock data.\n")
+
+    print("Falling back to mock match data.\n")
+    return _mock_matches(today)
+
+
+def _enrich_with_bbc(matches: list, target_date: str) -> list:
+    """Attach BBC-sourced narrative detail to each match's `context` dict."""
+    for match in matches:
+        home = canonical(match["homeTeam"]["name"])
+        away = canonical(match["awayTeam"]["name"])
+        detail = fetch_bbc_match_details(home, away, target_date)
+        if not detail:
+            continue
+        match.setdefault("context", {})
+        for team in (home, away):
+            existing = match["context"].get(team, "")
+            match["context"][team] = f"{existing}\n{detail}".strip()
+    return matches
 
 
 def _mock_matches(today: str) -> list:
@@ -78,6 +162,10 @@ def _mock_matches(today: str) -> list:
                 "score": {"fullTime": {"home": 3, "away": 0}, "halfTime": {"home": 1, "away": 0}},
                 "status": "FINISHED",
                 "utcDate": f"{today}T15:00:00Z",
+                "sources": {
+                    "results": "https://www.flashscore.com/match/football/brighton-2XrRecc3/chelsea-4fGZN2oK/",
+                    "details": "https://www.bbc.co.uk/sport/football/premier-league",
+                },
                 "context": {
                     "Brighton & Hove Albion": (
                         "Result lifted Brighton above Chelsea into 6th place on 50 points "
