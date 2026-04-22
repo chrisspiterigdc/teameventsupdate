@@ -116,8 +116,8 @@ def generate_team_news(team: str, match: dict, client: anthropic.Anthropic) -> s
         "Do not use headers, bullet points, emoji, or first-person language. Plain prose only."
     )
     msg = client.messages.create(
-        model="claude-sonnet-4-6",
-        max_tokens=300,
+        model="claude-opus-4-7",
+        max_tokens=500,
         messages=[{"role": "user", "content": prompt}],
     )
     blurb = msg.content[0].text.strip()
