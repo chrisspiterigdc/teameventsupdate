@@ -812,9 +812,11 @@ def build_slack_message(
 
 def generate_wc_page_intro(client: Anthropic, team: str, fixture: dict) -> str:
     """
-    Generate an updated odds-page introduction paragraph for a WC team.
+    Generate an updated odds-page introduction for a WC team.
+    Produces a preview if the match is upcoming, or a result recap if completed.
     The intro must open with '[Team] World Cup odds'.
     """
+    is_completed = fixture.get("status") == "completed"
     score = score_str(fixture)
     opponent = (
         fixture["away_team_display"]
@@ -822,29 +824,45 @@ def generate_wc_page_intro(client: Anthropic, team: str, fixture: dict) -> str:
         else fixture["home_team_display"]
     )
     home_away = "home" if fixture["home_team_display"] == team else "away"
-    status = fixture.get("status", "unknown")
     venue = fixture.get("venue_name", "")
+    kickoff = format_kickoff(fixture["start_date"])
     bbc_ctx = fixture.get("bbc_context", "").strip()
 
-    match_desc = (
-        f"{team} played {home_away} against {opponent}"
-        + (f" at {venue}" if venue else "")
-        + (f", final score {score}" if score else "")
-        + (f". Status: {status}")
-        + (f". Additional context: {bbc_ctx}" if bbc_ctx else "")
-    )
+    if is_completed:
+        match_desc = (
+            f"{team} played {home_away} against {opponent}"
+            + (f" at {venue}" if venue else "")
+            + (f", final score {score}" if score else "")
+            + (f". Additional context: {bbc_ctx}" if bbc_ctx else "")
+        )
+        prompt = f"""You are a sports betting content writer updating a World Cup odds page for {team}.
 
-    prompt = f"""You are a sports betting content writer updating a World Cup odds page for {team}.
-
-Today's match data:
+Today's result:
 {match_desc}
 
 Write a 2–3 paragraph introduction for the '{team} World Cup odds' page that:
 - Opens with the exact words "{team} World Cup odds" as the very first words of the text.
-- Reflects their actual tournament performance based on today's result.
-- Mentions the opponent, score (if available), and what the result means for their campaign.
-- Ends with a sentence noting the page will be updated after each match and pointing readers to check back for latest odds analysis and next match previews.
-- Uses plain text (no markdown). Punchy, factual, suitable for an SEO odds page."""
+- Reflects their tournament performance based on today's result.
+- Mentions the opponent, score, and what the result means for their campaign.
+- Ends noting the page updates after each match and readers should check back for latest odds and next match previews.
+- Plain text only (no markdown). Punchy, factual, SEO-suitable."""
+    else:
+        match_desc = (
+            f"{team} play {home_away} against {opponent}"
+            + (f" at {venue}" if venue else "")
+            + f" today, kick-off {kickoff}."
+        )
+        prompt = f"""You are a sports betting content writer updating a World Cup odds page for {team}.
+
+Today's upcoming fixture:
+{match_desc}
+
+Write a 2–3 paragraph introduction for the '{team} World Cup odds' page that:
+- Opens with the exact words "{team} World Cup odds" as the very first words of the text.
+- Covers the current tournament situation — their group, key players, what's at stake in today's match.
+- Builds anticipation for the fixture with relevant context (form, squad strength, tournament ambitions).
+- Ends noting the page will be updated with their result after the match and readers should check back for latest odds analysis.
+- Plain text only (no markdown). Punchy, factual, SEO-suitable."""
 
     message = client.messages.create(
         model="claude-sonnet-4-6",
@@ -962,27 +980,26 @@ def main():
     wc_scheduled = [f for f in wc_fixtures if f.get("status") in ("unplayed", "scheduled")]
     print(f"[WC] Fixtures: {len(wc_fixtures)} total, {len(wc_completed)} completed, {len(wc_scheduled)} scheduled")
 
-    # Generate page intros only for teams that played today (completed matches)
-    teams_played: set[str] = set()
+    # Generate page intros for all teams with a fixture today (completed or scheduled)
+    team_fixture_map: dict[str, dict] = {}
     for fix in wc_completed:
-        teams_played.add(fix["home_team_display"])
-        teams_played.add(fix["away_team_display"])
+        team_fixture_map[fix["home_team_display"]] = fix
+        team_fixture_map[fix["away_team_display"]] = fix
+    for fix in wc_scheduled:
+        # completed takes priority if a team has both (shouldn't happen, but safe)
+        team_fixture_map.setdefault(fix["home_team_display"], fix)
+        team_fixture_map.setdefault(fix["away_team_display"], fix)
 
     wc_intros: dict[str, str] = {}
-    if teams_played:
-        print(f"\nGenerating WC page intros for {len(teams_played)} team(s) via Claude...")
-        # Build a quick lookup: team -> fixture
-        team_fixture_map: dict[str, dict] = {}
-        for fix in wc_completed:
-            team_fixture_map[fix["home_team_display"]] = fix
-            team_fixture_map[fix["away_team_display"]] = fix
-
-        for team in sorted(teams_played):
+    if team_fixture_map:
+        print(f"\nGenerating WC page intros for {len(team_fixture_map)} team(s) via Claude...")
+        for team in sorted(team_fixture_map):
             fix = team_fixture_map[team]
-            print(f"  Generating intro for {team}...")
+            label = "result" if fix.get("status") == "completed" else "preview"
+            print(f"  [{label}] {team}...")
             wc_intros[team] = generate_wc_page_intro(client, team, fix)
     else:
-        print("[WC] No completed matches today — skipping page intro generation.")
+        print("[WC] No fixtures today — skipping page intro generation.")
 
     wc_slack_msg = build_wc_slack_message(wc_fixtures, wc_intros, wc_source, today_str)
     print("\n=== WC SLACK MESSAGE ===")
