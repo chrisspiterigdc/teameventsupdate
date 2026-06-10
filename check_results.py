@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Premier League match results checker.
-Fetches today's EPL fixtures via Optic Odds API, generates summaries via Claude,
-and posts them to Slack.
+Premier League + FIFA World Cup 2026 match results checker.
+Fetches today's EPL and WC fixtures, generates summaries/page intros via Claude,
+and posts them to Slack (two separate messages).
 """
 
 import json
@@ -48,6 +48,30 @@ N8N_PROXY_URL = "https://gdcgroup.app.n8n.cloud/webhook/opticodds-proxy"
 OPTICODDS_BASE = "https://api.opticodds.com/api/v3"
 OPTICODDS_KEY = os.environ.get("OPTICODDS_KEY", "")
 FIXTURES_FALLBACK = "/tmp/epl_fixtures_today.json"
+WC_FIXTURES_FALLBACK = "/tmp/wc_fixtures_today.json"
+
+# All 48 FIFA World Cup 2026 teams (verify/update as final qualifiers are confirmed)
+WC2026_TEAMS = [
+    # CONMEBOL (6)
+    "Argentina", "Brazil", "Colombia", "Ecuador", "Uruguay", "Venezuela",
+    # UEFA (16)
+    "England", "France", "Germany", "Spain", "Portugal", "Netherlands",
+    "Belgium", "Croatia", "Austria", "Switzerland", "Denmark", "Serbia",
+    "Poland", "Ukraine", "Romania", "Albania",
+    # CONCACAF (6 + 3 hosts)
+    "United States", "Mexico", "Canada", "Panama", "Costa Rica", "Jamaica",
+    "Honduras", "El Salvador", "Trinidad and Tobago",
+    # AFC (8 + 1 host)
+    "Japan", "South Korea", "Australia", "Iran", "Saudi Arabia", "Qatar",
+    "Jordan", "Iraq", "Uzbekistan",
+    # CAF (9)
+    "Morocco", "Senegal", "Egypt", "Nigeria", "South Africa",
+    "Ivory Coast", "Ghana", "Tunisia", "Algeria",
+    # OFC (1)
+    "New Zealand",
+    # Intercontinental play-off winners (adjust when confirmed)
+    "Indonesia", "Paraguay",
+]
 
 
 def fetch_fixtures_via_proxy(target_date: str) -> list[dict]:
@@ -78,6 +102,225 @@ def fetch_fixtures_direct(target_date: str) -> list[dict]:
 def load_fixtures_from_file(path: str) -> list[dict]:
     with open(path) as f:
         return json.load(f).get("data", [])
+
+
+# ---------------------------------------------------------------------------
+# World Cup 2026 fixture fetchers (same Optic Odds API, different league slug)
+# ---------------------------------------------------------------------------
+
+WC_LEAGUE_SLUG = "fifa_-_world_cup"
+
+
+def fetch_wc_fixtures_via_proxy(target_date: str) -> list[dict]:
+    """Fetch WC 2026 fixtures via n8n OpticOdds proxy."""
+    url = (
+        f"{OPTICODDS_BASE}/fixtures"
+        f"?sport=soccer&league={WC_LEAGUE_SLUG}"
+        f"&start_date={target_date}&end_date={target_date}"
+    )
+    resp = requests.post(N8N_PROXY_URL, json={"url": url}, timeout=15)
+    resp.raise_for_status()
+    return resp.json().get("data", [])
+
+
+def fetch_wc_fixtures_direct(target_date: str) -> list[dict]:
+    """Fetch WC 2026 fixtures directly from Optic Odds (requires API key)."""
+    url = (
+        f"{OPTICODDS_BASE}/fixtures"
+        f"?sport=soccer&league={WC_LEAGUE_SLUG}"
+        f"&start_date={target_date}&end_date={target_date}"
+        f"&key={OPTICODDS_KEY}"
+    )
+    resp = requests.get(url, timeout=15)
+    resp.raise_for_status()
+    return resp.json().get("data", [])
+
+
+def fetch_wc_from_bbc(target_date: str) -> list[dict]:
+    """Scrape BBC Sport for WC 2026 match scores."""
+    if not BS4_AVAILABLE:
+        raise RuntimeError("beautifulsoup4 not installed")
+    url = f"https://www.bbc.com/sport/football/world-cup-2026/scores-fixtures/{target_date}"
+    resp = requests.get(url, headers=BBC_HEADERS, timeout=15)
+    resp.raise_for_status()
+    soup = BeautifulSoup(resp.text, "lxml")
+    fixtures = []
+    for item in soup.select("[data-fixture-id], [data-test='fixture-row']"):
+        try:
+            teams = item.select(".sp-c-fixture__team-name-trunc, .gs-u-display-none")
+            scores = item.select(".sp-c-fixture__number")
+            status_el = item.select_one(".sp-c-fixture__status")
+            if len(teams) < 2:
+                continue
+            home_name = teams[0].get_text(strip=True)
+            away_name = teams[1].get_text(strip=True)
+            status_text = status_el.get_text(strip=True) if status_el else ""
+            home_score = int(scores[0].get_text(strip=True)) if len(scores) >= 2 else None
+            away_score = int(scores[1].get_text(strip=True)) if len(scores) >= 2 else None
+            is_completed = "FT" in status_text or "AET" in status_text
+            context_parts = []
+            for el in item.select(
+                ".sp-c-fixture__scorers, [class*='scorer'], [class*='goal'],"
+                "[class*='venue'], [class*='attendance'], [class*='summary'],"
+                "[class*='detail'], [aria-label]"
+            ):
+                text = el.get_text(" ", strip=True)
+                if text and text not in context_parts:
+                    context_parts.append(text)
+            fixture = {
+                "home_team_display": home_name,
+                "away_team_display": away_name,
+                "start_date": f"{target_date}T00:00:00Z",
+                "status": "completed" if is_completed else "unplayed",
+                "season_week": "",
+                "venue_name": "",
+                "bbc_context": " | ".join(context_parts),
+                "result": {
+                    "scores": {
+                        "home": {"total": home_score},
+                        "away": {"total": away_score},
+                    } if home_score is not None else None
+                },
+            }
+            fixtures.append(fixture)
+        except Exception:
+            continue
+    return fixtures
+
+
+def fetch_wc_from_flashscore(target_date: str) -> list[dict]:
+    """Scrape FlashScore mobile for WC 2026 results."""
+    if not BS4_AVAILABLE:
+        raise RuntimeError("beautifulsoup4 not installed")
+    url = "https://www.flashscore.mobi/football/world/world-cup/"
+    resp = requests.get(url, headers=FS_HEADERS, timeout=15)
+    resp.raise_for_status()
+    soup = BeautifulSoup(resp.text, "lxml")
+    fixtures = []
+    today = target_date
+    for row in soup.select(".event__match, .row, [class*='match']"):
+        try:
+            text = row.get_text(" ", strip=True)
+            if today.replace("-", ".") not in text and today not in text:
+                continue
+            teams = row.select(".event__participant, .team-name, [class*='team']")
+            scores_el = row.select(".event__score, .score")
+            if len(teams) < 2:
+                continue
+            home_name = teams[0].get_text(strip=True)
+            away_name = teams[1].get_text(strip=True)
+            home_score = away_score = None
+            if len(scores_el) >= 2:
+                try:
+                    home_score = int(scores_el[0].get_text(strip=True))
+                    away_score = int(scores_el[1].get_text(strip=True))
+                except ValueError:
+                    pass
+            status_el = row.select_one("[class*='status'], [class*='stage']")
+            status_text = status_el.get_text(strip=True) if status_el else ""
+            is_completed = home_score is not None and ("FT" in status_text or "Finished" in status_text)
+            fixture = {
+                "home_team_display": home_name,
+                "away_team_display": away_name,
+                "start_date": f"{target_date}T00:00:00Z",
+                "status": "completed" if is_completed else "unplayed",
+                "season_week": "",
+                "venue_name": "",
+                "bbc_context": "",
+                "result": {
+                    "scores": {
+                        "home": {"total": home_score},
+                        "away": {"total": away_score},
+                    } if home_score is not None else None
+                },
+            }
+            fixtures.append(fixture)
+        except Exception:
+            continue
+    return fixtures
+
+
+def get_today_wc_fixtures() -> tuple[list[dict], str]:
+    """
+    Fetch WC 2026 fixtures for today. Same fallback priority as EPL:
+      1+2. Optic Odds (n8n proxy) + BBC Sport  — simultaneous (primary)
+      3+2. Optic Odds (direct)   + BBC Sport  — simultaneous (fallback)
+        4. BBC Sport alone
+        5. FlashScore mobile scraper
+        6. Pre-fetched local file
+    """
+    today = date.today().isoformat()
+
+    def _try_proxy():
+        return fetch_wc_fixtures_via_proxy(today)
+
+    def _try_direct():
+        return fetch_wc_fixtures_direct(today) if OPTICODDS_KEY else None
+
+    def _try_bbc():
+        return fetch_wc_from_bbc(today)
+
+    opticodds_fixtures = bbc_fixtures = None
+
+    with ThreadPoolExecutor(max_workers=2) as ex:
+        fut_odds = ex.submit(_try_proxy)
+        fut_bbc = ex.submit(_try_bbc)
+        try:
+            opticodds_fixtures = fut_odds.result()
+            print(f"[WC] Fetched {len(opticodds_fixtures)} fixture(s) via n8n proxy")
+        except Exception as e:
+            print(f"[WC] n8n proxy unavailable: {e}", file=sys.stderr)
+        try:
+            bbc_fixtures = fut_bbc.result()
+            print(f"[WC] Fetched {len(bbc_fixtures)} fixture(s) from BBC Sport")
+        except Exception as e:
+            print(f"[WC] BBC Sport unavailable: {e}", file=sys.stderr)
+
+    if opticodds_fixtures is not None:
+        if bbc_fixtures:
+            opticodds_fixtures = merge_with_bbc(opticodds_fixtures, bbc_fixtures)
+            return opticodds_fixtures, "Optic Odds (n8n proxy) + BBC Sport"
+        return opticodds_fixtures, "Optic Odds (n8n proxy)"
+
+    with ThreadPoolExecutor(max_workers=2) as ex:
+        fut_odds = ex.submit(_try_direct)
+        fut_bbc = ex.submit(_try_bbc) if bbc_fixtures is None else None
+        try:
+            opticodds_fixtures = fut_odds.result()
+            if opticodds_fixtures is not None:
+                print(f"[WC] Fetched {len(opticodds_fixtures)} fixture(s) directly from Optic Odds")
+        except Exception as e:
+            print(f"[WC] Optic Odds direct unavailable: {e}", file=sys.stderr)
+        if fut_bbc is not None:
+            try:
+                bbc_fixtures = fut_bbc.result()
+                print(f"[WC] Fetched {len(bbc_fixtures)} fixture(s) from BBC Sport")
+            except Exception as e:
+                print(f"[WC] BBC Sport unavailable: {e}", file=sys.stderr)
+
+    if opticodds_fixtures is not None:
+        if bbc_fixtures:
+            opticodds_fixtures = merge_with_bbc(opticodds_fixtures, bbc_fixtures)
+            return opticodds_fixtures, "Optic Odds (direct) + BBC Sport"
+        return opticodds_fixtures, "Optic Odds (direct)"
+
+    if bbc_fixtures:
+        return bbc_fixtures, "BBC Sport"
+
+    try:
+        fixtures = fetch_wc_from_flashscore(today)
+        if fixtures:
+            print(f"[WC] Fetched {len(fixtures)} fixture(s) from FlashScore")
+            return fixtures, "FlashScore"
+    except Exception as e:
+        print(f"[WC] FlashScore unavailable: {e}", file=sys.stderr)
+
+    if os.path.exists(WC_FIXTURES_FALLBACK):
+        fixtures = load_fixtures_from_file(WC_FIXTURES_FALLBACK)
+        print(f"[WC] Loaded {len(fixtures)} fixture(s) from fallback file")
+        return fixtures, "pre-fetched file"
+
+    return [], "no source available"
 
 
 # ---------------------------------------------------------------------------
@@ -563,6 +806,100 @@ def build_slack_message(
     return "\n".join(lines)
 
 
+# ---------------------------------------------------------------------------
+# World Cup page intro generator
+# ---------------------------------------------------------------------------
+
+def generate_wc_page_intro(client: Anthropic, team: str, fixture: dict) -> str:
+    """
+    Generate an updated odds-page introduction paragraph for a WC team.
+    The intro must open with '[Team] World Cup odds'.
+    """
+    score = score_str(fixture)
+    opponent = (
+        fixture["away_team_display"]
+        if fixture["home_team_display"] == team
+        else fixture["home_team_display"]
+    )
+    home_away = "home" if fixture["home_team_display"] == team else "away"
+    status = fixture.get("status", "unknown")
+    venue = fixture.get("venue_name", "")
+    bbc_ctx = fixture.get("bbc_context", "").strip()
+
+    match_desc = (
+        f"{team} played {home_away} against {opponent}"
+        + (f" at {venue}" if venue else "")
+        + (f", final score {score}" if score else "")
+        + (f". Status: {status}")
+        + (f". Additional context: {bbc_ctx}" if bbc_ctx else "")
+    )
+
+    prompt = f"""You are a sports betting content writer updating a World Cup odds page for {team}.
+
+Today's match data:
+{match_desc}
+
+Write a 2–3 paragraph introduction for the '{team} World Cup odds' page that:
+- Opens with the exact words "{team} World Cup odds" as the very first words of the text.
+- Reflects their actual tournament performance based on today's result.
+- Mentions the opponent, score (if available), and what the result means for their campaign.
+- Ends with a sentence noting the page will be updated after each match and pointing readers to check back for latest odds analysis and next match previews.
+- Uses plain text (no markdown). Punchy, factual, suitable for an SEO odds page."""
+
+    message = client.messages.create(
+        model="claude-sonnet-4-6",
+        max_tokens=400,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    return message.content[0].text
+
+
+def build_wc_slack_message(
+    fixtures: list[dict],
+    intros: dict[str, str],
+    source: str,
+    today_str: str,
+) -> str:
+    completed = [f for f in fixtures if f.get("status") == "completed"]
+    scheduled = [f for f in fixtures if f.get("status") in ("unplayed", "scheduled")]
+
+    lines = [
+        f"*FIFA World Cup 2026 Update — {today_str}*",
+        "",
+    ]
+
+    if completed:
+        lines.append(f"*Results today ({len(completed)} match{'es' if len(completed) != 1 else ''}):*")
+        for fix in completed:
+            sc = score_str(fix)
+            lines.append(f"• {fix['home_team_display']} {sc} {fix['away_team_display']} ✅")
+        lines.append("")
+
+    if scheduled:
+        lines.append(f"*Upcoming today ({len(scheduled)} match{'es' if len(scheduled) != 1 else ''}):*")
+        for fix in scheduled:
+            lines.append(
+                f"• {fix['home_team_display']} vs {fix['away_team_display']}"
+                f" — KO {format_kickoff(fix['start_date'])} 🕐"
+            )
+        lines.append("")
+
+    if not completed and not scheduled:
+        lines.append("No World Cup fixtures today.")
+        lines.append("")
+
+    if intros:
+        lines.append("*Updated page intros (copy-paste into CMS):*")
+        lines.append("─" * 40)
+        for team, intro in intros.items():
+            lines.append(f"*{team}*")
+            lines.append(intro)
+            lines.append("─" * 40)
+
+    lines.append(f"_Source: {source}_")
+    return "\n".join(lines)
+
+
 SLACK_CHANNEL_ID = "C0AVBC6256C"
 
 
@@ -586,39 +923,79 @@ def post_to_slack(message: str) -> bool:
 
 def main():
     today_str = date.today().strftime("%A, %d %B %Y")
+    client = _make_anthropic_client()
+
+    # -----------------------------------------------------------------------
+    # Part 1: Premier League
+    # -----------------------------------------------------------------------
     print(f"\n=== Premier League Match Results — {today_str} ===\n")
 
-    # 1. Fetch fixtures
     fixtures, source = get_today_fixtures()
-
     completed = [f for f in fixtures if f.get("status") == "completed"]
     scheduled = [f for f in fixtures if f.get("status") in ("unplayed", "scheduled")]
-
     print(f"Fixtures found: {len(fixtures)} total, {len(completed)} completed, {len(scheduled)} scheduled")
 
-    # 2. Build team status map
     team_status = build_team_status(fixtures)
 
-    # 3. Generate Claude summary
-    print("\nGenerating summary via Claude...")
-    client = _make_anthropic_client()
+    print("\nGenerating EPL summary via Claude...")
     summary = generate_summary(client, completed, scheduled)
     print(f"\nSummary:\n{summary}\n")
 
-    # 4. Build full Slack message
-    slack_msg = build_slack_message(team_status, summary, source, today_str)
-    print("=== SLACK MESSAGE ===")
-    print(slack_msg)
-    print("====================\n")
+    epl_slack_msg = build_slack_message(team_status, summary, source, today_str)
+    print("=== EPL SLACK MESSAGE ===")
+    print(epl_slack_msg)
+    print("========================\n")
 
-    # 5. Try to post to Slack
-    posted = post_to_slack(slack_msg)
-    if posted:
-        print("Posted to Slack successfully.")
+    epl_posted = post_to_slack(epl_slack_msg)
+    if epl_posted:
+        print("EPL message posted to Slack successfully.")
     else:
-        print("Slack posting not available in this environment — message printed above.")
+        print("EPL Slack posting not available — message printed above.")
 
-    return slack_msg
+    # -----------------------------------------------------------------------
+    # Part 2: FIFA World Cup 2026
+    # -----------------------------------------------------------------------
+    print(f"\n=== FIFA World Cup 2026 — {today_str} ===\n")
+
+    wc_fixtures, wc_source = get_today_wc_fixtures()
+    wc_completed = [f for f in wc_fixtures if f.get("status") == "completed"]
+    wc_scheduled = [f for f in wc_fixtures if f.get("status") in ("unplayed", "scheduled")]
+    print(f"[WC] Fixtures: {len(wc_fixtures)} total, {len(wc_completed)} completed, {len(wc_scheduled)} scheduled")
+
+    # Generate page intros only for teams that played today (completed matches)
+    teams_played: set[str] = set()
+    for fix in wc_completed:
+        teams_played.add(fix["home_team_display"])
+        teams_played.add(fix["away_team_display"])
+
+    wc_intros: dict[str, str] = {}
+    if teams_played:
+        print(f"\nGenerating WC page intros for {len(teams_played)} team(s) via Claude...")
+        # Build a quick lookup: team -> fixture
+        team_fixture_map: dict[str, dict] = {}
+        for fix in wc_completed:
+            team_fixture_map[fix["home_team_display"]] = fix
+            team_fixture_map[fix["away_team_display"]] = fix
+
+        for team in sorted(teams_played):
+            fix = team_fixture_map[team]
+            print(f"  Generating intro for {team}...")
+            wc_intros[team] = generate_wc_page_intro(client, team, fix)
+    else:
+        print("[WC] No completed matches today — skipping page intro generation.")
+
+    wc_slack_msg = build_wc_slack_message(wc_fixtures, wc_intros, wc_source, today_str)
+    print("\n=== WC SLACK MESSAGE ===")
+    print(wc_slack_msg)
+    print("========================\n")
+
+    wc_posted = post_to_slack(wc_slack_msg)
+    if wc_posted:
+        print("WC message posted to Slack successfully.")
+    else:
+        print("WC Slack posting not available — message printed above.")
+
+    return epl_slack_msg, wc_slack_msg
 
 
 if __name__ == "__main__":
