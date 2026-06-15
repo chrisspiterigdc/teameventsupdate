@@ -49,7 +49,7 @@ Once validated, generate two things:
 1. A short Slack update summarising today's results and tomorrow's kick-offs
 2. A 3-paragraph page intro for every team with a fixture (today or tomorrow)
 
-**Completed match intros** — reflect the result and what it means for their campaign.
+**Completed match intros** — reflect the result and what it means for their campaign. Only state facts the data directly confirms: the final score and the half-time score (period 1 totals). Do not infer or describe the sequence of goals within a half — the API returns period totals only, not a goal-by-goal timeline, so the order of scoring is unknown.
 
 **Upcoming match intros** — cover the fixture context and what's at stake.
 
