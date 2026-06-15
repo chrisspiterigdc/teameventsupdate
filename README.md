@@ -44,6 +44,8 @@ Flag any issues and stop if something looks wrong.
 
 ### 3. Generate content
 
+All kick-off times must be displayed in BST (British Summer Time, UTC+1). Convert all times from the UTC values returned by the API before writing any content.
+
 Once validated, generate two things:
 
 1. A short Slack update summarising today's results and tomorrow's kick-offs
